@@ -12,14 +12,24 @@ A colour grading tool in one web page, made for cinematographers, editors and co
 - **Colour (HSL)** – saturation, skin-safe vibrance, tap any colour to change its hue, saturation and lightness
 - **Split tone** – shadow and highlight tint with balance
 - **B&W & film** – fade / matte blacks, black & white with colour filters and channel mixer
-- **Shot match** – load a reference frame and match colour and contrast to it
+- **Decode ref** – load any reference frame and it is rebuilt as normal sliders (exposure, contrast, blacks, whites, saturation, warmth, split tones) with a plain-English list of what makes the look, plus match % before/after. Quick one-knob match also available
 - **Looks** – 11 built-in looks, save your own, share looks as code
 
 ## Keyboard (desktop)
 
-`1`–`0` tools · `E` export · `Z` undo · `Y` redo · hold `B` before · `S` split · `F` false colour · `W` pick neutral · `Esc` cancel
+`1`–`0` tools · `K` LUT check · `E` export · `Space` play/pause · `,` `.` frame step · `M` mark shot · `Z` undo · `Y` redo · hold `B` before · `S` split · `F` false colour · `W` pick neutral · `Esc` cancel
 
 Every control has a number box for exact values and a ↺ reset.
+
+## Video
+
+Open an MP4/WebM clip and play it with the grade live. Scrub, step frame by frame, mark shots to jump between them, and export any frame at full resolution. Scopes and frame report update when paused. (ProRes/RAW and some HEVC files can't play in browsers: export an H.264 proxy.)
+
+## LUT check
+
+Tests your grade or any imported `.cube` and scores it /100: clipping, tone reversals, banding, flattened tones, grey tint, skin hue and saturation (skin types I–VI incl. wheatish and dusky Indian tones), colour shifts, black/white points, LUT size, out-of-range values. Imported LUTs can also be used on the frame with a strength slider.
+
+**Auto-fix**: protect skin, soften clipping, smooth banding, optional neutral greys. Shows score before → after; use the fixed LUT on the frame or save it as a new .cube.
 
 ## Checking tools
 
@@ -30,6 +40,11 @@ Every control has a number box for exact values and a ↺ reset.
 - Colour breakdown of the graded frame: colour groups with shades and %, main colours with HEX, RGB, HSL, CMYK
 
 ## Export
+
+- Graded image at full resolution (up to 6000 px), JPG or PNG
+- Choose a LUT folder and an image folder once (Chrome/Edge on a computer); remembered next time, never overwrites
+- Phones/Safari: saves to Downloads
+
 
 `.cube` 3D LUT in 17, 33 or 65 size. Works in Premiere Pro, DaVinci Resolve, Final Cut Pro, CapCut, LumaFusion, Photoshop, OBS. The preview runs through the same LUT, so the file matches the screen.
 

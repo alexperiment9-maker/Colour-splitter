@@ -81,6 +81,20 @@ textarea.inp{min-height:64px;padding:6px 8px;font-size:12px}
 .ck{display:flex;gap:8px;align-items:center;margin-top:8px;min-height:32px}
 .ck input{width:18px;height:18px;accent-color:#ddd}
 .st{color:var(--dim);font-size:12px;margin-top:8px;min-height:16px}
+.score{font-size:15px;margin:6px 0}.score b{font-size:22px}
+.ck2{width:100%;border-collapse:collapse;margin:0}.ck2 td{vertical-align:top;border-bottom:1px solid var(--ln);padding:6px 4px;white-space:normal}
+.tag2{display:inline-block;min-width:46px;text-align:center;font-size:11px;font-weight:700;padding:2px 4px;border:1px solid}
+.PASS{color:#8c8}.WARN{color:#e5c158}.FAIL{color:#ff7070}.INFO{color:#aaa}
+.dl{padding-left:18px;margin:6px 0}.dl li{margin:3px 0}
+.fold{display:flex;gap:6px;align-items:center;margin-top:6px}.fold span{flex:1}
+.bad{color:#ff7070;margin-top:6px}
+.vtime{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:13px;color:var(--dim)}
+.shots{display:flex;gap:4px;overflow-x:auto}
+.shots button{padding:0;border:1px solid var(--ln);background:#000;position:relative;flex:0 0 auto}
+.shots button[aria-pressed=true]{border-color:#fff}
+.shots img{display:block;height:46px}
+.shots span{position:absolute;left:0;bottom:0;background:#000;color:#ccc;font-size:10px;padding:0 3px}
+.fx{display:grid;gap:2px;margin-top:4px}
 /* report */
 .rep{border-top:1px solid var(--ln);padding:12px 10px 40px}
 .rep h2{font-size:14px;margin-bottom:8px}
@@ -112,7 +126,7 @@ td.n{text-align:right}
 <body>
 <div class="hd">
   <h1>COLOUR SPLITTER PRO</h1>
-  <span class="b">Open<input type="file" id="pick" accept="image/*" aria-label="Open image"></span>
+  <span class="b">Open<input type="file" id="pick" accept="image/*,video/*" aria-label="Open photo or video"></span>
   <span class="b">Camera<input type="file" id="cam" accept="image/*" capture="environment" aria-label="Take photo"></span>
   <button class="b" id="undo" disabled title="Undo (Z)">Undo</button>
   <button class="b" id="redo" disabled title="Redo (Y)">Redo</button>
@@ -135,6 +149,15 @@ td.n{text-align:right}
       <button class="b" id="vfc" aria-pressed="false">False col <kbd>F</kbd></button>
       <select id="scopeSel" aria-label="Scope"><option value="off">Scope off</option><option value="hist">Histogram</option><option value="wave">Waveform</option><option value="parade">Parade</option><option value="vec">Vectorscope</option></select>
     </div>
+    <div class="vb" id="vbar" hidden>
+      <button class="b" id="vplay" style="min-width:76px">Play</button>
+      <button class="b" id="vprev" aria-label="Previous frame" title="Previous frame (,)">&lt;|</button>
+      <button class="b" id="vnext" aria-label="Next frame" title="Next frame (.)">|&gt;</button>
+      <input type="range" id="vt" min="0" max="1" step="0.001" value="0" aria-label="Video position">
+      <span id="vtime" class="vtime">0:00.00</span>
+      <button class="b" id="vmark" title="Mark shot (M)">Mark shot</button>
+    </div>
+    <div class="shots" id="shots" hidden></div>
     <div class="fcl" id="fcl" hidden>
       <span><i style="background:#7b2cff"></i>&lt;2.5</span><span><i style="background:#1e6bff"></i>2.5–4</span><span><i style="background:#2bd34a"></i>38–42 grey</span><span><i style="background:#ff6fcf"></i>52–56 skin</span><span><i style="background:#ffe600"></i>97–99</span><span><i style="background:#ff1f1f"></i>99+ clip</span><span>IRE</span>
     </div>
@@ -169,7 +192,7 @@ const D=()=>({input:'none',match:{on:0,str:100},light:{exp:0,temp:0,tint:0},
   tone:{con:0,piv:45,hi:0,sh:0,wh:0,bl:0},
   prim:{lift:[0,0,0,0],gamma:[0,0,0,0],gain:[0,0,0,0],offset:[0,0,0,0]},
   curves:{m:I2(),r:I2(),g:I2(),b:I2()},col:{sat:0,vib:0,targets:[]},
-  split:{sh:200,shs:0,hh:40,hs:0,bal:0},film:{fade:0,bw:0,mr:30,mg:59,mb:11}});
+  split:{sh:200,shs:0,hh:40,hs:0,bal:0},film:{fade:0,bw:0,mr:30,mg:59,mb:11},ext:{on:0,mix:100}});
 let S=D(),SEL=-1;const DJ=JSON.stringify(D());
 const get=(k,o=S)=>k.split('.').reduce((a,p)=>a[p],o);
 const set=(k,v)=>{const p=k.split('.'),l=p.pop();p.reduce((a,q)=>a[q],S)[l]=v};
@@ -216,7 +239,7 @@ const isI=p=>p.length===2&&p[0][0]===0&&p[0][1]===0&&p[1][0]===1&&p[1][1]===1;
 const cv=(T,x)=>{x=cl(x)*255;const i=x|0;return i>=255?T[255]:T[i]+(T[i+1]-T[i])*(x-i)};
 const cvec=(h,a)=>{const c=hsl2rgb(h,1,.5),m=(c[0]+c[1]+c[2])/3;return c.map(v=>(v-m)*a)};
 const pv=(v,k)=>[0,1,2].map(i=>(v[i]+v[3])/100*k);
-function prep(noInput){const s=S;Q={};Q.id=JSON.stringify(s)===DJ;Q.dec=noInput?null:DEC[s.input]||null;
+function prep(noInput){const s=S;Q={};Q.id=JSON.stringify(s)===DJ;Q.dec=noInput?null:DEC[s.input]||null;Q.ext=s.ext.on&&EXT?EXT:null;Q.exm=s.ext.mix/100;
   if(s.match.on&&REF&&SRC){const k=(r,q)=>Math.min(2.5,Math.max(.4,r/(q||1)));Q.mt={s:s.match.str/100,sL:SRC.m[0],sA:SRC.m[1],sB:SRC.m[2],rL:REF.m[0],rA:REF.m[1],rB:REF.m[2],kL:k(REF.d[0],SRC.d[0]),kA:k(REF.d[1],SRC.d[1]),kB:k(REF.d[2],SRC.d[2])}}
   const L=s.light,e=2**L.exp,t=L.temp/100,ti=L.tint/100;Q.lt=L.exp||t||ti;Q.m=[e*(1+.3*t),e*(1-.3*ti),e*(1-.3*t)];
   const T=s.tone;Q.tn=T.con||T.hi||T.sh||T.wh||T.bl;Q.lo=-T.bl/100*.15;Q.hi=1-T.wh/100*.15;Q.shd=T.sh/100;Q.hil=T.hi/100;Q.k=2**(T.con/100*1.3);Q.p=T.piv/100;
@@ -228,6 +251,7 @@ function prep(noInput){const s=S;Q={};Q.id=JSON.stringify(s)===DJ;Q.dec=noInput?
   const F=s.film;Q.fade=F.fade/100;Q.bw=F.bw;const ms=F.mr+F.mg+F.mb;Q.mx=Math.abs(ms)<1?[.2126,.7152,.0722]:[F.mr/ms,F.mg/ms,F.mb/ms]}
 function xf(r,g,b,upto=9){
   if(Q.dec){r=tm(Q.dec(r));g=tm(Q.dec(g));b=tm(Q.dec(b))}
+  if(Q.ext){const o=tri01(Q.ext,r,g,b),m=Q.exm;r+=(o[0]-r)*m;g+=(o[1]-g)*m;b+=(o[2]-b)*m}
   if(upto<2)return[cl(r),cl(g),cl(b)];
   if(Q.mt){const m=Q.mt;let[L,A,B]=toLab(cl(r),cl(g),cl(b));L+=((L-m.sL)*m.kL+m.rL-L)*m.s;A+=((A-m.sA)*m.kA+m.rA-A)*m.s;B+=((B-m.sB)*m.kB+m.rB-B)*m.s;[r,g,b]=fromLab(L,A,B)}
   if(upto<3)return[cl(r),cl(g),cl(b)];
@@ -335,7 +359,7 @@ const LOOKS={
   'Sepia':{tone:{con:10},film:{bw:1,fade:20},split:{sh:30,shs:30,hh:40,hs:25}}};
 let saved=[];try{saved=JSON.parse(localStorage.getItem('cs-looks')||'[]')}catch(_){}
 const store=()=>{try{localStorage.setItem('cs-looks',JSON.stringify(saved))}catch(_){}};
-const lookOnly=()=>{const o=deep(S);delete o.input;delete o.match;return o};
+const lookOnly=()=>{const o=deep(S);delete o.input;delete o.match;delete o.ext;return o};
 function applyLook(l){const keep={input:S.input,match:S.match};S=mg(D(),l);S.input=keep.input;S.match=keep.match;SEL=S.col.targets.length?0:-1;renderPanel();schedule(true);push()}
 const BWF={None:[30,59,11],Red:[90,20,-10],Orange:[70,40,-10],Yellow:[50,60,-10],Green:[10,90,0],Blue:[-10,20,90]};
 let PG='lift',CH='m',tool='light',pickMode='hsl';
@@ -364,18 +388,31 @@ const TOOLS=[
  ['film','B&W / Film','9',()=>row('film.fade','Fade (matte)',0,100)+`<div class="sec">BLACK & WHITE</div><button class="b" id="bwt" aria-pressed="${!!S.film.bw}">B&W ${S.film.bw?'ON':'OFF'}</button>
    <div class="grid2" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.keys(BWF).map(k=>`<button class="b" data-bwf="${k}">${k}</button>`).join('')}</div>`+
    row('film.mr','Mix red',-100,200)+row('film.mg','Mix green',-100,200)+row('film.mb','Mix blue',-100,200)],
- ['match','Shot match','0',()=>`<p class="hint" style="margin-top:8px">Load a reference frame. This frame's colour and contrast are matched to it.</p>
-   <div class="grid2"><span class="b">Load reference<input type="file" id="refin" accept="image/*" aria-label="Load reference"></span>${REF?`<button class="b" id="mon" aria-pressed="${!!S.match.on}">Match ${S.match.on?'ON':'OFF'}</button>`:''}</div>
-   ${REF?row('match.str','Strength',0,100):'<p class="hint">No reference loaded.</p>'}`],
- ['export','Export','E',()=>`<div class="sec">CUBE LUT</div><input class="inp" id="lname" value="${esc(XN)}" aria-label="LUT name">
+ ['match','Decode ref','0',()=>`<p class="hint" style="margin-top:8px">Load a reference frame: a film still, another clip, a post you like.</p>
+   <div class="grid2"><span class="b">Load reference<input type="file" id="refin" accept="image/*" aria-label="Load reference"></span></div>
+   ${REF?`<div class="sec">DECODE INTO SLIDERS (recommended)</div><button class="b on" id="decode" style="width:100%">Decode look → sliders</button>
+   <p class="hint">Rebuilds the reference look with normal sliders you can read and change. Replaces the current grade (Undo brings it back).</p><div>${DECR}</div>
+   <div class="sec">QUICK MATCH (one knob, not editable)</div><button class="b" id="mon" aria-pressed="${!!S.match.on}">Quick match ${S.match.on?'ON':'OFF'}</button>${row('match.str','Strength',0,100)}`:'<p class="hint">No reference loaded.</p>'}`],
+ ['check','LUT check','K',()=>`<div class="sec">WHAT TO CHECK</div><div class="grid2"><button class="b" data-cs="grade" aria-pressed="${CS==='grade'||!EXT}">Current grade</button><button class="b" data-cs="ext" aria-pressed="${CS==='ext'&&!!EXT}" ${EXT?'':'disabled'}>Imported LUT</button></div>
+   <div class="grid2"><span class="b">Load .cube<input type="file" id="cubein" accept=".cube,.CUBE,text/plain" aria-label="Load cube LUT"></span>${EXT?`<button class="b" id="extuse" aria-pressed="${!!S.ext.on}">Use on frame ${S.ext.on?'ON':'OFF'}</button>`:''}</div>
+   ${EXT?`<p class="hint">Loaded: ${esc(EXT.name)} · ${EXT.N}³${EXT.title?' · '+esc(EXT.title):''}. "Use on frame" applies it first; your grade goes on top.</p>`+(S.ext.on?row('ext.mix','Imported LUT strength',0,100):''):''}
+   <div id="chk"></div>`],
+ ['export','Export','E',()=>`<div class="sec">LUT</div><input class="inp" id="lname" value="${esc(XN)}" aria-label="File name">
    <div class="grid4" style="margin-top:6px">${[17,33,65].map(n=>`<button class="b" data-sz="${n}" aria-pressed="${XS===n}">${n}</button>`).join('')}</div>
    <label class="ck"><input type="checkbox" id="inclIn" ${XI?'checked':''}> Include input conversion (${esc(INPUTS.find(i=>i[0]===S.input)[1])})</label>
-   <div class="grid2"><button class="b on" id="dl">Download .cube</button><button class="b" id="cp">Copy text</button></div>
-   <p class="st" id="st">33 = standard (Premiere, Resolve, FCP, CapCut, LumaFusion, OBS).</p>`]];
+   <div class="sec">GRADED IMAGE</div><div class="grid4"><button class="b" data-fmt="jpg" aria-pressed="${IF==='jpg'}">JPG</button><button class="b" data-fmt="png" aria-pressed="${IF==='png'}">PNG</button></div>
+   ${IF==='jpg'?`<div class="r"><label for="iq">JPG quality</label><input type="number" id="iq" min="60" max="100" value="${IQ}"><span></span></div>`:''}
+   <p class="hint">Full resolution of the opened photo (up to 6000 px long side), always with the full grade.</p>
+   <div class="sec">SAVE TO</div>${folderUI()}
+   <div class="grid2" style="margin-top:8px"><button class="b on" id="svlut">Save LUT</button><button class="b on" id="svimg">Save image</button><button class="b" id="svboth">Save both</button><button class="b" id="cp">Copy LUT text</button></div>
+   <p class="st" id="st"></p>`]];
+function folderUI(){if(canFS)return['lut','img'].map(k=>`<div class="fold"><span>${k==='lut'?'LUTs':'Images'}: <b>${DIR[k]?esc(DIR[k].name):(k==='img'&&DIR.lut?'same as LUTs':'not set')}</b></span><button class="b" data-dir="${k}">Choose</button>${DIR[k]?`<button class="b" data-dclr="${k}" aria-label="Clear folder">×</button>`:''}</div>`).join('')+'<p class="hint">Remembered for next time. Files are never overwritten (adds -2, -3…).</p>';
+  if(inFrame)return'<p class="hint">Inside Claude, files are saved through Claude. The LUT comes inside a .zip (Claude doesn\'t allow .cube downloads). To save straight into a folder you choose, open your GitHub version in Chrome or Edge on a computer.</p>';
+  return'<p class="hint">This browser can\'t choose folders (phones and Safari can\'t). Files go to Downloads. Folder saving works in Chrome or Edge on a computer.</p>'}
 let XN='my-look',XS=33,XI=true;
 const TK={};TOOLS.forEach(t=>TK[t[0]]=t);
 
-function toolMod(k){const d=D();switch(k){case'looks':case'export':return false;case'input':return S.input!=='none';case'match':return!!S.match.on;
+function toolMod(k){const d=D();switch(k){case'looks':case'export':return false;case'check':return!!S.ext.on;case'input':return S.input!=='none';case'match':return!!S.match.on;
   case'col':return!!(S.col.sat||S.col.vib||S.col.targets.some(t=>t.dh||t.ds||t.dl));default:return JSON.stringify(S[k])!==JSON.stringify(d[k])}}
 function markNav(){document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('mod',toolMod(b.dataset.t)))}
 $('nav').innerHTML=TOOLS.map(([k,l,key])=>`<button data-t="${k}" aria-pressed="${k===tool}"><span>${l}</span><span style="display:flex;gap:6px;align-items:center"><i class="m"></i><kbd>${key}</kbd></span></button>`).join('');
@@ -383,9 +420,9 @@ function openTool(k){tool=k;document.querySelectorAll('#nav button').forEach(b=>
 const toPanel=()=>{if(!matchMedia('(max-width:1000px)').matches)return;const y=document.querySelector('.ph').getBoundingClientRect().top+scrollY-$('mon').offsetHeight-$('nav').offsetHeight;if(scrollY>y)scrollTo(0,y)};
 $('nav').onclick=e=>{const b=e.target.closest('button');if(b){openTool(b.dataset.t);toPanel()}};
 $('goEx').onclick=()=>{openTool('export');const y=document.querySelector('.ph').getBoundingClientRect().top+scrollY-(matchMedia('(max-width:1000px)').matches?$('mon').offsetHeight+$('nav').offsetHeight:0);scrollTo(0,Math.max(0,y))};
-function renderPanel(){const t=TK[tool];$('pt').textContent=t[1].toUpperCase();$('ptr').hidden=['looks','export'].includes(tool);$('panel').innerHTML=t[3]();
-  if(tool==='curves')initCurves();if(tool==='col')drawTargets();markNav()}
-$('ptr').onclick=()=>{const d=D();if(tool==='input')S.input='none';else if(tool==='match')S.match=d.match;else if(tool==='col'){S.col=d.col;SEL=-1}else S[tool]=d[tool];renderPanel();schedule(true);push()};
+function renderPanel(){const t=TK[tool];$('pt').textContent=t[1].toUpperCase();$('ptr').hidden=['looks','export','check'].includes(tool);$('panel').innerHTML=t[3]();
+  if(tool==='curves')initCurves();if(tool==='col')drawTargets();if(tool==='check')runCheck();markNav()}
+$('ptr').onclick=()=>{const d=D();if(tool==='input')S.input='none';else if(tool==='match'){S.match=d.match;DECR=''}else if(tool==='check')S.ext=d.ext;else if(tool==='col'){S.col=d.col;SEL=-1}else S[tool]=d[tool];renderPanel();schedule(true);push()};
 
 const panel=$('panel');
 function setVal(k,v,live){const mn=+panel.querySelector(`input[type=range][data-k="${k}"]`).min,mx=+panel.querySelector(`input[type=range][data-k="${k}"]`).max;
@@ -396,7 +433,8 @@ panel.addEventListener('input',e=>{const k=e.target.dataset.k;if(k){if(e.target.
   const tk=e.target.dataset.tt;if(tk){const t=S.col.targets[SEL];t[tk]=+e.target.value;e.target.parentNode.querySelectorAll('[data-tt]').forEach(el=>{if(el!==e.target)el.value=t[tk]});schedule()}});
 panel.addEventListener('change',e=>{const k=e.target.dataset.k;if(k){setVal(k,+e.target.value,false);push();return}
   if(e.target.dataset.tt){const t=S.col.targets[SEL];t[e.target.dataset.tt]=+e.target.value;push();drawTargets();schedule(true)}
-  if(e.target.id==='inclIn')XI=e.target.checked;if(e.target.id==='lname')XN=e.target.value;if(e.target.id==='refin')loadRef(e.target.files[0])});
+  if(e.target.id==='inclIn')XI=e.target.checked;if(e.target.id==='lname')XN=e.target.value;if(e.target.id==='refin')loadRef(e.target.files[0]);
+  if(e.target.id==='cubein')loadCube(e.target.files[0]);if(e.target.id==='iq')IQ=Math.min(100,Math.max(60,+e.target.value||95))});
 panel.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
   if(d.rs){setVal(d.rs,get(d.rs,D()),false);push();return}
   if(d.look)return applyLook(LOOKS[d.look]);
@@ -408,6 +446,10 @@ panel.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)retu
   if(d.pg){PG=d.pg;return renderPanel()}
   if(d.sz){XS=+d.sz;return renderPanel()}
   if(d.ti!=null){SEL=+d.ti;return drawTargets()}
+  if(d.cs){CS=d.cs;return renderPanel()}
+  if(d.fmt){IF=d.fmt;return renderPanel()}
+  if(d.dir){pickDir(d.dir);return}
+  if(d.dclr){DIR[d.dclr]=null;hput(d.dclr,null);return renderPanel()}
   switch(t.id){
     case'ssave':{const n=$('sname').value.trim()||'Look '+(saved.length+1);saved.unshift({n,l:lookOnly()});store();renderPanel();break}
     case'lcopy':{const c=JSON.stringify(lookOnly());try{navigator.clipboard.writeText(c).then(()=>t.textContent='Copied',()=>$('lpaste').value=c)}catch(_){$('lpaste').value=c}break}
@@ -419,7 +461,13 @@ panel.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)retu
     case'bwt':S.film.bw=S.film.bw?0:1;renderPanel();schedule(true);push();break;
     case'mon':S.match.on=S.match.on?0:1;renderPanel();schedule(true);push();break;
     case'tdel':S.col.targets.splice(SEL,1);SEL=S.col.targets.length-1;drawTargets();schedule(true);push();break;
-    case'dl':exportDl();break;case'cp':exportCp();break}});
+    case'decode':decode();break;
+    case'fixgo':autoFix();break;
+    case'fixchk':EXT=FIXED;CS='ext';FIXED=null;renderPanel();break;
+    case'fixuse':{const fromGrade=!(CS==='ext'&&EXT);EXT=FIXED;FIXED=null;CS='ext';if(fromGrade){const inp=S.input;S=D();S.input=inp;SEL=-1}S.ext.on=1;S.ext.mix=100;renderPanel();schedule(true);push();break}
+    case'fixsave':deliver([{kind:'lut',name:FIXED.name,blob:new Blob([cubeFrom(FIXED)],{type:'text/plain'})}]);break;
+    case'extuse':S.ext.on=S.ext.on?0:1;renderPanel();schedule(true);push();break;
+    case'svlut':doSave('lut');break;case'svimg':doSave('img');break;case'svboth':doSave('both');break;case'cp':exportCp();break}});
 
 /* curves */
 let drag=-1;
@@ -465,7 +513,7 @@ function labStats(arr){const L=arr.map(c=>toLab(...c)),m=[0,1,2].map(i=>L.reduce
 function statsSrc(){if(!px.length)return;const k=S.match.on;S.match.on=0;prep();SRC=labStats(px.map(p=>xf(p[0]/255,p[1]/255,p[2]/255,1)));S.match.on=k}
 function loadRef(f){if(!f)return;const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{const s=Math.min(1,120/Math.max(im.width,im.height)),w=Math.max(1,Math.round(im.width*s)),h=Math.max(1,Math.round(im.height*s)),c=document.createElement('canvas');c.width=w;c.height=h;
   const x=c.getContext('2d');x.drawImage(im,0,0,w,h);const d=x.getImageData(0,0,w,h).data,a=[];for(let i=0;i<d.length;i+=4)a.push([d[i]/255,d[i+1]/255,d[i+2]/255]);
-  REF=labStats(a);statsSrc();S.match.on=1;URL.revokeObjectURL(u);renderPanel();schedule(true);push()};im.src=u}
+  REF=labStats(a);REFPX=a;REFST=stats(a);DECR='';statsSrc();URL.revokeObjectURL(u);renderPanel()};im.src=u}
 
 /* ============ frame report ============ */
 const FAM=['Red','Orange','Yellow','Green','Cyan','Blue','Purple','Pink','Brown','White','Grey','Black'];
@@ -496,12 +544,12 @@ $('fam').onclick=rep;$('main').onclick=rep;
 $('shades').onchange=analyse;$('mainN').onchange=analyse;
 
 /* ============ load ============ */
-function load(img,label){const k=Math.min(1,720/Math.max(img.width,img.height));view.width=Math.max(1,Math.round(img.width*k));view.height=Math.max(1,Math.round(img.height*k));
+function load(img,label){srcImg=img;const k=Math.min(1,720/Math.max(img.width,img.height));view.width=Math.max(1,Math.round(img.width*k));view.height=Math.max(1,Math.round(img.height*k));
   vctx.drawImage(img,0,0,view.width,view.height);orig=vctx.getImageData(0,0,view.width,view.height);out=vctx.createImageData(view.width,view.height);
   const s=Math.min(1,150/Math.max(img.width,img.height)),w=Math.max(1,Math.round(img.width*s)),h=Math.max(1,Math.round(img.height*s)),t=document.createElement('canvas');t.width=w;t.height=h;
   const tc=t.getContext('2d',{willReadFrequently:true});tc.drawImage(img,0,0,w,h);const d=tc.getImageData(0,0,w,h).data;px=[];for(let i=0;i<d.length;i+=4)if(d[i+3]>128)px.push([d[i],d[i+1],d[i+2]]);
   $('tag').textContent=label.toUpperCase().slice(0,40);$('ring').style.display='none';statsSrc();schedule(true);requestAnimationFrame(wipeLine)}
-function fromFile(f){if(!f||!f.type.startsWith('image/'))return;const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{load(im,f.name||'Frame');URL.revokeObjectURL(u)};im.src=u}
+function fromFile(f){if(!f)return;if(f.type.startsWith('video/')||/\.(mp4|mov|m4v|webm|mkv)$/i.test(f.name))return loadVideo(f);if(!f.type.startsWith('image/'))return;stopVideo();const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{load(im,f.name||'Frame');URL.revokeObjectURL(u)};im.src=u}
 $('cam').onchange=e=>fromFile(e.target.files[0]);$('pick').onchange=e=>fromFile(e.target.files[0]);
 const drop=$('drop');drop.ondragover=e=>e.preventDefault();drop.ondrop=e=>{e.preventDefault();fromFile(e.dataTransfer.files[0])};
 view.addEventListener('click',e=>{if(!orig)return;const r=view.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*view.width),y=Math.floor((e.clientY-r.top)/r.height*view.height);
@@ -512,11 +560,12 @@ const navTop=()=>{$('nav').style.top=matchMedia('(max-width:1000px)').matches?$(
 addEventListener('resize',()=>{wipeLine();navTop()});new ResizeObserver(navTop).observe($('mon'));
 
 /* ============ keyboard ============ */
-addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select')||e.metaKey||e.ctrlKey||e.altKey)return;const k=e.key;
+addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select')||e.metaKey||e.ctrlKey||e.altKey)return;const k=e.key;if((k===' '||k==='Enter')&&e.target.closest('button'))return;
   const t=TOOLS.find(t=>t[2].toLowerCase()===k.toLowerCase());if(t){openTool(t[0]);e.preventDefault();return}
   if(k==='z'){undo();e.preventDefault()}else if(k==='y'||k==='Z'){redo();e.preventDefault()}
   else if(k==='b'&&!e.repeat)before(true);else if(k==='s')togSplit();else if(k==='f')togFC();
-  else if(k==='w'){openTool('light');setPick('wb')}else if(k==='Escape')setPick('hsl')});
+  else if(k==='w'){openTool('light');setPick('wb')}else if(k==='Escape')setPick('hsl');
+  else if(VID&&k===' '){play();e.preventDefault()}else if(VID&&k===','){fstep(-1)}else if(VID&&k==='.'){fstep(1)}else if(VID&&k==='m'){markShot()}});
 addEventListener('keyup',e=>{if(e.key==='b')before(false)});
 
 /* ============ export ============ */
@@ -525,10 +574,244 @@ function cubeText(){const N=XS,incl=XI;prep(!incl);const a=buildLut(N);prep();co
   for(let i=0;i<a.length;i+=3)L.push(a[i].toFixed(6)+' '+a[i+1].toFixed(6)+' '+a[i+2].toFixed(6));return L.join('\n')+'\n'}
 let dlr=null;if(window.claude&&window.claude.use)window.claude.use('downloads').then(d=>dlr=d,()=>{});
 const stat=m=>{const s=$('st');if(s)s.textContent=m};
-async function exportDl(){XN=$('lname').value;const t=cubeText(),name=(XN||'my-look').replace(/[^\w\- ]/g,'')+'.cube';
-  if(dlr){try{await dlr.save({filename:name,data:t});stat('Saved '+name)}catch(_){stat('Cancelled or blocked. Use Copy text.')}return}
-  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'application/octet-stream'}));a.download=name;document.body.appendChild(a);a.click();a.remove();stat('Saving '+name)}catch(_){stat('Blocked. Use Copy text.')}}
 function exportCp(){XN=$('lname').value;const t=cubeText();try{navigator.clipboard.writeText(t).then(()=>stat('Copied '+XS+'³ LUT. Paste into a text file named name.cube'),()=>stat('Copy blocked. Use Download.'))}catch(_){stat('Copy blocked. Use Download.')}}
+
+/* ============ imported LUT ============ */
+let EXT=null,CS='grade';
+function parseCube(txt,name){let N=0,mn=[0,0,0],mx=[1,1,1],title='',vals=[],oor=0;
+  for(const raw of txt.split(/\r?\n/)){const l=raw.trim();if(!l||l[0]==='#')continue;
+    if(/^TITLE/i.test(l)){title=l.replace(/^TITLE\s*/i,'').replace(/"/g,'');continue}
+    if(/^LUT_1D_SIZE/i.test(l))throw new Error('1D LUTs are not supported. Use a 3D .cube.');
+    if(/^LUT_3D_SIZE/i.test(l)){N=parseInt(l.split(/\s+/)[1]);continue}
+    if(/^DOMAIN_MIN/i.test(l)){mn=l.split(/\s+/).slice(1,4).map(Number);continue}
+    if(/^DOMAIN_MAX/i.test(l)){mx=l.split(/\s+/).slice(1,4).map(Number);continue}
+    if(/^[A-Za-z_]/.test(l))continue;
+    const p=l.split(/\s+/).map(Number);if(p.length>=3&&p.slice(0,3).every(isFinite)){vals.push(p[0],p[1],p[2]);for(let i=0;i<3;i++)if(p[i]<-.001||p[i]>1.001)oor++}}
+  if(!N||N<2||N>129)throw new Error('No LUT_3D_SIZE found.');
+  if(vals.length<N*N*N*3)throw new Error('File has '+vals.length/3+' entries, needs '+N*N*N+'.');
+  return{N,mn,mx,title,name,L:Float32Array.from(vals.slice(0,N*N*N*3)),oor}}
+function tri01(E,r,g,b){const N=E.N,N2=N*N,L=E.L,k=N-1,
+  fr=cl((r-E.mn[0])/(E.mx[0]-E.mn[0]))*k,fg=cl((g-E.mn[1])/(E.mx[1]-E.mn[1]))*k,fb=cl((b-E.mn[2])/(E.mx[2]-E.mn[2]))*k;
+  let r0=fr|0,g0=fg|0,b0=fb|0;if(r0>N-2)r0=N-2;if(g0>N-2)g0=N-2;if(b0>N-2)b0=N-2;
+  const dr=fr-r0,dg=fg-g0,db=fb-b0,p=(b0*N2+g0*N+r0)*3,G=N*3,B=N2*3,o=[0,0,0];
+  for(let c=0;c<3;c++){const q=p+c,a0=L[q]+(L[q+3]-L[q])*dr,a1=L[q+G]+(L[q+G+3]-L[q+G])*dr,a2=L[q+B]+(L[q+B+3]-L[q+B])*dr,a3=L[q+B+G]+(L[q+B+G+3]-L[q+B+G])*dr,y0=a0+(a1-a0)*dg;o[c]=y0+(a2+(a3-a2)*dg-y0)*db}
+  return o}
+function loadCube(f){if(!f)return;const rd=new FileReader();rd.onload=()=>{try{EXT=parseCube(String(rd.result),f.name);CS='ext';renderPanel()}catch(e){const c=$('chk');if(c)c.innerHTML=`<p class="bad">Could not read ${esc(f.name)}: ${esc(e.message)}</p>`}};rd.readAsText(f)}
+
+/* ============ LUT health check ============ */
+const SKIN=[['I','#F6E1D3'],['II','#E8C4A8'],['III','#D9A981'],['Wheatish','#C68E66'],['IV','#B07A55'],['Dusky','#8D5A3B'],['V','#6B4029'],['VI','#4A2C1E']];
+const h2c=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16)/255);
+const vang=([r,g,b])=>Math.atan2(.5*r-.4542*g-.0458*b,-.1146*r-.3854*g+.5*b)*180/Math.PI;
+const labC=c=>{const L=toLab(...c.map(cl));return Math.hypot(L[1],L[2])},labH=c=>{const L=toLab(...c.map(cl));return Math.atan2(L[2],L[1])*180/Math.PI};
+const wrap=d=>((d+540)%360)-180,Yof=o=>.2126*o[0]+.7152*o[1]+.0722*o[2];
+const RAMPS=[['Grey',t=>[t,t,t]],['Skin',t=>hsl2rgb(24,.45,t)],['Red',t=>hsl2rgb(0,.9,t)],['Yellow',t=>hsl2rgb(60,.9,t)],['Green',t=>hsl2rgb(120,.9,t)],['Cyan',t=>hsl2rgb(180,.9,t)],['Blue',t=>hsl2rgb(240,.9,t)],['Magenta',t=>hsl2rgb(300,.9,t)]];
+function tests(f,E){const R=[];
+  // clipping
+  let n=0,c0=0;const G=15;for(let b=1;b<G;b++)for(let g=1;g<G;g++)for(let r=1;r<G;r++){const o=f(r/G,g/G,b/G);n++;if(o[0]<=.002||o[1]<=.002||o[2]<=.002||o[0]>=.998||o[1]>=.998||o[2]>=.998)c0++}
+  const cp=c0/n*100;R.push([cp<3?'PASS':cp<10?'WARN':'FAIL','Clipping',cp.toFixed(1)+'% of colours','Colours pushed to pure black, white or full saturation lose all detail there.']);
+  // ramps
+  const outs={};let rev=[0,''],jump=[0,''],flat=[0,''];
+  for(const[nm,fn]of RAMPS){const o=[];for(let i=0;i<512;i++)o.push(f(...fn(i/511)));outs[nm]=o;
+    let mxY=-1,drop=0,run=0,longest=0;const st=[];
+    for(let i=0;i<512;i++){const Y=Yof(o[i]);if(Y>mxY)mxY=Y;drop=Math.max(drop,mxY-Y);
+      if(i){const d=Math.abs(Y-Yof(o[i-1]));st.push(d);if(d<1e-4&&Y>.02&&Y<.98){run++;longest=Math.max(longest,run)}else run=0}}
+    const nz=st.filter(d=>d>1e-5).sort((a,b)=>a-b),med=nz.length?nz[nz.length>>1]:0,mx=st.length?Math.max(...st):0,jr=med&&mx>.02?mx/med:0;
+    if(drop>rev[0])rev=[drop,nm];if(jr>jump[0])jump=[jr,nm];if(longest>flat[0])flat=[longest,nm]}
+  R.push([rev[0]>.02?'FAIL':rev[0]>.005?'WARN':'PASS','Tone reversals',rev[0]>.005?`${rev[1]}: brighter input gets darker (${(rev[0]*100).toFixed(1)}%)`:'none','A reversal makes gradients like skies and skin break into wrong-looking bands or halos.']);
+  R.push([jump[0]>25?'FAIL':jump[0]>10?'WARN':'PASS','Banding / steps',jump[0]>10?`${jump[1]}: sudden step ${jump[0].toFixed(0)}× normal`:'smooth','Sudden steps show as visible bands in skies, walls and skin, worse after compression.']);
+  R.push([flat[0]>100?'FAIL':flat[0]>40?'WARN':'PASS','Flattened tones',flat[0]>40?`${flat[1]}: ${Math.round(flat[0]/511*100)}% of range collapses to one value`:'none','Flat zones turn smooth areas into blotches (posterisation).']);
+  // grey
+  let gC=0,gAt=0;for(const t of[.1,.3,.5,.7,.9]){const c=labC(f(t,t,t));if(c>gC){gC=c;gAt=t}}
+  R.push([gC<4?'PASS':gC<12?'INFO':'WARN','Neutral greys',gC<4?'neutral':`tinted ${gAt<.4?'shadows':gAt<.65?'mids':'highlights'} (${gC.toFixed(1)})`,'Tinted greys are fine for a creative look, but a "neutral" LUT should keep greys grey.']);
+  // skin
+  let sk=[0,''],sat=1;const skinOut=SKIN.map(([nm,h])=>{const i=h2c(h),o=f(...i),d=wrap(vang(o)-vang(i)),r=labC(o)/Math.max(1,labC(i));if(Math.abs(d)>Math.abs(sk[0]))sk=[d,nm];if(Math.abs(Math.log(r))>Math.abs(Math.log(sat)))sat=r;return[nm,i,o]});
+  const sd=Math.abs(sk[0]);R.push([sd<8?'PASS':sd<18?'WARN':'FAIL','Skin hue',sd<2?'held':`up to ${sd.toFixed(0)}° toward ${sk[0]>0?'yellow-green':'red-magenta'} (type ${sk[1]})`,'Skin is the first thing viewers notice. Green or magenta skin reads as sick or fake.']);
+  R.push([sat>1.7||sat<.45?'WARN':'PASS','Skin saturation',(sat>=1?'+':'')+Math.round((sat-1)*100)+'%','Too much: orange skin. Too little: grey, lifeless skin.']);
+  // hue twist
+  let tw=[0,''];for(let h=0;h<360;h+=30){const i=hsl2rgb(h,.8,.5),d=wrap(labH(f(...i))-labH(i));if(Math.abs(d)>Math.abs(tw[0]))tw=[d,hueName(h)]}
+  const ta=Math.abs(tw[0]);R.push([ta>45?'WARN':ta>20?'INFO':'PASS','Colour shifts',ta>5?`${tw[1]} moves ${ta.toFixed(0)}°`:'colours stay true','Big shifts can be a deliberate look, but check product, brand and sky colours.']);
+  // black / white
+  const bk=Yof(f(0,0,0)),wt=Yof(f(1,1,1));R.push([bk>.15||wt<.75?'WARN':'INFO','Black / white points',`black ${(bk*100).toFixed(0)}% · white ${(wt*100).toFixed(0)}%`,'Very lifted blacks or dull whites waste the range and look washed out on phones.']);
+  if(E){R.push([E.N<17?'WARN':E.N<33?'INFO':'PASS','LUT size',E.N+'³',E.N<33?'Small LUTs can band in smooth gradients. 33 or more is standard.':'Good resolution.']);
+    if(E.oor)R.push(['WARN','Out-of-range values',E.oor+' values outside 0–1','Some apps clip these differently, so the look can change between apps.'])}
+  const fails=R.filter(r=>r[0]==='FAIL').length,warns=R.filter(r=>r[0]==='WARN').length,score=Math.max(0,100-fails*25-warns*8);
+  return{R,outs,skinOut,score,verdict:score>=85?'GOOD':score>=60?'USABLE · CHECK WARNINGS':'RISKY'}}
+let FIXED=null,FIXR='';
+function runCheck(){const box=$('chk');if(!box)return;
+  const useExt=CS==='ext'&&EXT;prep(true);const f=useExt?(r,g,b)=>tri01(EXT,r,g,b):(r,g,b)=>xf(r,g,b);
+  const{R,outs,skinOut,score,verdict}=tests(f,useExt?EXT:null);prep();
+  box.innerHTML=`<div class="sec">RESULT · ${esc(useExt?EXT.name:'current grade')}</div><div class="score"><b>${score}</b>/100 · ${verdict}</div>
+    <table class="ck2">${R.map(([s,t,v,h])=>`<tr><td><span class="tag2 ${s}">${s}</span></td><td><b>${t}</b><br><span>${esc(v)}</span><div class="hint">${h}</div></td></tr>`).join('')}</table>
+    <div class="sec">TEST STRIPS (top: input · below: output)</div><canvas id="chkc" width="300" height="196" style="width:100%;border:1px solid var(--ln)"></canvas>
+    <p class="hint">${useExt?'':'Checked without the log conversion, on normal Rec.709 test colours. '}Skin row: types I–VI including wheatish and dusky Indian tones.</p>
+    <div class="sec">AUTO-FIX</div><div class="fx">
+    <label class="ck"><input type="checkbox" id="fx_sk" checked> Protect skin (pull hue back, limit saturation)</label>
+    <label class="ck"><input type="checkbox" id="fx_cl" checked> Soften clipping (keep detail in brights and darks)</label>
+    <label class="ck"><input type="checkbox" id="fx_sm" checked> Smooth banding and steps</label>
+    <label class="ck"><input type="checkbox" id="fx_gr"> Make greys neutral (removes creative tint)</label></div>
+    <button class="b on" id="fixgo" style="width:100%;margin-top:6px">Auto-fix ${useExt?'this LUT':'this grade'}</button>
+    ${FIXED?`<div class="score" style="margin-top:8px">${FIXR}</div><div class="grid2"><button class="b" id="fixuse">Use fixed on frame</button><button class="b" id="fixsave">Save fixed .cube</button></div><button class="b" id="fixchk" style="width:100%;margin-top:6px">Show full check of fixed LUT</button><p class="st" id="st"></p>`:''}`;
+  const c=$('chkc').getContext('2d'),W=300,px2=v=>Math.round(cl(v)*255);
+  const strip=(arr,y,h)=>{for(let x=0;x<W;x++){const o=arr[Math.floor(x/W*511)];c.fillStyle=`rgb(${px2(o[0])},${px2(o[1])},${px2(o[2])})`;c.fillRect(x,y,1,h)}};
+  strip(RAMPS[0][1]&&Array.from({length:512},(_,i)=>{const t=i/511;return[t,t,t]}),0,10);strip(outs.Grey,10,14);
+  let y=28;for(const[nm]of RAMPS.slice(1)){strip(outs[nm],y,14);y+=16}
+  const w=W/SKIN.length;skinOut.forEach(([nm,i,o],k)=>{c.fillStyle=`rgb(${i.map(px2)})`;c.fillRect(k*w,y+2,w-2,22);c.fillStyle=`rgb(${o.map(px2)})`;c.fillRect(k*w,y+24,w-2,22)})}
+
+function lutFromF(f,N){const L=new Float32Array(N*N*N*3),d=N-1;let i=0;for(let b=0;b<N;b++)for(let g=0;g<N;g++)for(let r=0;r<N;r++){const o=f(r/d,g/d,b/d);L[i++]=o[0];L[i++]=o[1];L[i++]=o[2]}return L}
+function smooth3(L,N,s){const T=Float32Array.from(L),ix=(r,g,b)=>((b*N+g)*N+r)*3;
+  for(let ax=0;ax<3;ax++){const S=Float32Array.from(T);for(let b=0;b<N;b++)for(let g=0;g<N;g++)for(let r=0;r<N;r++){const c=[r,g,b],lo=c.slice(),hi=c.slice();lo[ax]=Math.max(0,c[ax]-1);hi[ax]=Math.min(N-1,c[ax]+1);
+    const i=ix(r,g,b),i0=ix(lo[0],lo[1],lo[2]),i1=ix(hi[0],hi[1],hi[2]);for(let k=0;k<3;k++)T[i+k]=(S[i0+k]+2*S[i+k]+S[i1+k])/4}}
+  for(let i=0;i<L.length;i++)L[i]=L[i]*(1-s)+T[i]*s}
+function autoFix(){const useExt=CS==='ext'&&EXT;prep(true);const f=useExt?(r,g,b)=>tri01(EXT,r,g,b):(r,g,b)=>xf(r,g,b);
+  const before=tests(f,useExt?EXT:null).score,N=33,d=N-1,L=lutFromF(f,N);prep();
+  const o={sk:$('fx_sk').checked,cl:$('fx_cl').checked,sm:$('fx_sm').checked,gr:$('fx_gr').checked};
+  const pass=()=>{  let i=0;for(let b=0;b<N;b++)for(let g=0;g<N;g++)for(let r=0;r<N;r++,i+=3){
+    const ir=r/d,ig=g/d,ib=b/d,iY=.2126*ir+.7152*ig+.0722*ib,icb=-.1146*ir-.3854*ig+.5*ib,icr=.5*ir-.4542*ig-.0458*ib,iC=Math.hypot(icb,icr);
+    let R=L[i],G=L[i+1],B=L[i+2];
+    if(o.sk||o.gr){const Y=.2126*R+.7152*G+.0722*B;let cb=-.1146*R-.3854*G+.5*B,cr=.5*R-.4542*G-.0458*B;
+      if(o.sk&&iC>.02){const ia=Math.atan2(icr,icb)*180/Math.PI,w=Math.min(1,1.6*Math.max(0,1-Math.abs(wrap(ia-123))/40)*ss(.01,.04,iC)*(1-ss(.25,.35,iC))*ss(.03,.08,iY)*(1-ss(.93,.99,iY)));
+        if(w>0){const oa=Math.atan2(cr,cb)*180/Math.PI,dd=wrap(oa-ia),oc=Math.hypot(cb,cr),nc=iC*Math.min(1.4,Math.max(.7,oc/iC)),na=(oa-dd*w)*Math.PI/180,c2=oc+(nc-oc)*w;cb=Math.cos(na)*c2;cr=Math.sin(na)*c2}}
+      if(o.gr){const w=1-ss(.01,.04,iC);cb*=1-w;cr*=1-w}
+      R=Y+1.5748*cr;G=Y-.1873*cb-.4681*cr;B=Y+1.8556*cb}
+    if(o.cl){const hiOK=Math.max(ir,ig,ib)<1,loOK=Math.min(ir,ig,ib)>0&&iY>.05,f2=v=>{if(hiOK&&v>.94)v=.94+.06*(1-Math.exp(-(v-.94)/.06));if(loOK&&v<.06)v=.06*(.15+.85*Math.max(0,v/.06));return v};R=f2(R);G=f2(G);B=f2(B)}
+    L[i]=cl(R);L[i+1]=cl(G);L[i+2]=cl(B)}
+};
+  pass();
+  if(o.sm){smooth3(L,N,.75);smooth3(L,N,.5);pass()}
+
+  FIXED={N,mn:[0,0,0],mx:[1,1,1],L,title:'fixed',name:(useExt?EXT.name.replace(/\.cube$/i,''):safe())+'-fixed.cube',oor:0};
+  const after=tests((r,g,b)=>tri01(FIXED,r,g,b),FIXED).score;FIXR=`Score <b>${before}</b> → <b>${after}</b>`;renderPanel()}
+function cubeFrom(E){const L=['# Colour Splitter Pro · auto-fixed','TITLE "'+E.name.replace(/\.cube$/i,'')+'"','LUT_3D_SIZE '+E.N,'DOMAIN_MIN 0.0 0.0 0.0','DOMAIN_MAX 1.0 1.0 1.0'];
+  for(let i=0;i<E.L.length;i+=3)L.push(E.L[i].toFixed(6)+' '+E.L[i+1].toFixed(6)+' '+E.L[i+2].toFixed(6));return L.join('\n')+'\n'}
+function hueName(h){h=((h%360)+360)%360;return h<15||h>=345?'red':h<45?'orange':h<70?'yellow':h<160?'green':h<200?'teal':h<255?'blue':h<290?'purple':'pink'}
+
+/* ============ reference → editable sliders ============ */
+let REFPX=null,REFST=null,DECR='';
+let HUELUT=null;
+function hueFromLab(a){if(!HUELUT){HUELUT=[];for(let h=0;h<360;h+=2)HUELUT.push([h,labH(hsl2rgb(h,1,.5))])}let best=0,bd=1e9;for(const[h,la]of HUELUT){const d=Math.abs(wrap(la-a));if(d<bd){bd=d;best=h}}return best}
+function stats(arr){const Ys=arr.map(Yof).sort((a,b)=>a-b),n=Ys.length,q=p=>Ys[Math.min(n-1,Math.floor(n*p))];
+  const lo=q(.05),hi=q(.95);let s=0,s2=0,m=0;for(const y of Ys)if(y>=lo&&y<=hi){s+=y;s2+=y*y;m++}const mean=s/Math.max(1,m),std=Math.sqrt(Math.max(0,s2/Math.max(1,m)-mean*mean));
+  let C=0;const acc={s:[0,0,0],m:[0,0,0],h:[0,0,0]};
+  for(const c of arr){const L=toLab(...c.map(cl)),Y=Yof(c);C+=Math.hypot(L[1],L[2]);const k=Y<.3?'s':Y>.7?'h':'m';acc[k][0]+=L[1];acc[k][1]+=L[2];acc[k][2]++}
+  const av=k=>acc[k][2]?[acc[k][0]/acc[k][2],acc[k][1]/acc[k][2]]:[0,0];
+  return{p1:q(.01),p50:q(.5),p99:q(.99),std,C:C/arr.length,mid:av('m'),sh:av('s'),hl:av('h')}}
+function simil(a,b){const d=Math.abs(a.p1-b.p1)*120+Math.abs(a.p50-b.p50)*120+Math.abs(a.p99-b.p99)*80+Math.abs(a.std-b.std)*200+Math.abs(a.C-b.C)*1.2+
+  Math.hypot(a.mid[0]-b.mid[0],a.mid[1]-b.mid[1])*1.2+Math.hypot(a.sh[0]-b.sh[0],a.sh[1]-b.sh[1])*.8+Math.hypot(a.hl[0]-b.hl[0],a.hl[1]-b.hl[1])*.8;return Math.max(0,Math.round(100-d))}
+function decode(){if(!REFST||!px.length)return;const st=Math.max(1,Math.floor(px.length/5000)),src=[];for(let i=0;i<px.length;i+=st)src.push(px[i].map(v=>v/255));
+  const keepIn=S.input,keepExt=deep(S.ext);S=D();S.input=keepIn;S.ext=keepExt;SEL=-1;
+  const run=()=>{prep();return stats(src.map(p=>xf(...p)))};
+  const before=simil(run(),REFST);const sv=[0,0],hv=[0,0];const R=REFST;
+  if(R.C<3)S.film.bw=1;
+  for(let it=0;it<9;it++){const o=run(),T=S.tone,L=S.light;
+    L.exp=Math.max(-3,Math.min(3,L.exp+Math.max(-1,Math.min(1,Math.log2(Math.max(.003,R.p50)**2.2/Math.max(.003,o.p50)**2.2)*.7))));
+    T.con=Math.max(-100,Math.min(100,T.con+Math.max(-30,Math.min(30,Math.log2(Math.max(.01,R.std)/Math.max(.01,o.std))/1.3*100*.7))));
+    const db=R.p1-o.p1;if(db>0||S.film.fade>0)S.film.fade=Math.max(0,Math.min(100,S.film.fade+db/.09*100*.8));else T.bl=Math.max(-100,Math.min(100,T.bl+db/.15*100*.8));
+    T.wh=Math.max(-100,Math.min(100,T.wh+(R.p99-o.p99)/.15*100*.8));
+    if(!S.film.bw)S.col.sat=Math.max(-100,Math.min(100,S.col.sat+(R.C/Math.max(1,o.C)-1)*100*.7));
+    L.temp=Math.max(-100,Math.min(100,L.temp+(R.mid[1]-o.mid[1])*2.2));L.tint=Math.max(-100,Math.min(100,L.tint+(R.mid[0]-o.mid[0])*2.2));
+    sv[0]+=(R.sh[0]-o.sh[0])*2;sv[1]+=(R.sh[1]-o.sh[1])*2;hv[0]+=(R.hl[0]-o.hl[0])*2;hv[1]+=(R.hl[1]-o.hl[1])*2;
+    const P=S.split;P.shs=Math.min(100,Math.hypot(...sv));P.sh=hueFromLab(Math.atan2(sv[1],sv[0])*180/Math.PI);P.hs=Math.min(100,Math.hypot(...hv));P.hh=hueFromLab(Math.atan2(hv[1],hv[0])*180/Math.PI)}
+  // round for clean sliders
+  const rd=(o,k,d=0)=>o[k]=+o[k].toFixed(d);rd(S.light,'exp',2);['temp','tint'].forEach(k=>rd(S.light,k));['con','bl','wh'].forEach(k=>rd(S.tone,k));rd(S.col,'sat');rd(S.film,'fade');['sh','shs','hh','hs'].forEach(k=>rd(S.split,k));
+  if(S.split.shs<4)S.split.shs=0;if(S.split.hs<4)S.split.hs=0;
+  const after=simil(run(),REFST);
+  const W=[],L=S.light,T=S.tone,P=S.split;
+  if(S.film.bw)W.push('Black & white');
+  if(Math.abs(L.exp)>=.15)W.push(`${L.exp>0?'Brighter':'Darker'} exposure (${L.exp>0?'+':''}${L.exp} stops)`);
+  if(T.con>=10)W.push(`Punchy contrast (+${T.con})`);else if(T.con<=-10)W.push(`Low, soft contrast (${T.con})`);
+  if(S.film.fade>=5)W.push(`Matte, lifted blacks (fade ${S.film.fade})`);else if(T.bl<=-5)W.push(`Crushed, deep blacks (${T.bl})`);
+  if(T.wh<=-5)W.push(`Rolled-off, soft whites (${T.wh})`);else if(T.wh>=8)W.push(`Bright, pushed whites (+${T.wh})`);
+  if(!S.film.bw){if(S.col.sat<=-10)W.push(`Muted colour (${S.col.sat}%)`);else if(S.col.sat>=10)W.push(`Rich colour (+${S.col.sat}%)`)}
+  if(L.temp>=8)W.push(`Warm overall (+${L.temp})`);else if(L.temp<=-8)W.push(`Cool overall (${L.temp})`);
+  if(L.tint>=8)W.push(`Magenta lean (+${L.tint})`);else if(L.tint<=-8)W.push(`Green lean (${L.tint})`);
+  if(P.shs)W.push(`Shadows tinted ${hueName(P.sh)} (${P.shs})`);if(P.hs)W.push(`Highlights tinted ${hueName(P.hh)} (${P.hs})`);
+  if(!W.length)W.push('Close to neutral: the reference is graded much like your frame.');
+  DECR=`<div class="score">Match <b>${before}%</b> → <b>${after}%</b></div><div class="sec">WHAT MAKES THIS LOOK</div><ul class="dl">${W.map(w=>`<li>${w}</li>`).join('')}</ul>
+    <p class="hint">All of it is now in Light, Tone, HSL, Split tone and B&W/Film. Fine-tune it there, or save it under Looks.</p>`;
+  renderPanel();schedule(true);push()}
+
+/* ============ files: folders, zip, image ============ */
+const inFrame=(()=>{try{return window.top!==window}catch(_){return true}})();
+const canFS='showDirectoryPicker' in window&&!inFrame;
+const DIR={lut:null,img:null};
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('csp',1);r.onupgradeneeded=()=>r.result.createObjectStore('h');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function hput(k,v){try{const db=await idb();await new Promise(r=>{const t=db.transaction('h','readwrite');t.objectStore('h').put(v,k);t.oncomplete=r;t.onerror=r})}catch(_){}}
+async function hget(k){try{const db=await idb();return await new Promise(r=>{const q=db.transaction('h').objectStore('h').get(k);q.onsuccess=()=>r(q.result||null);q.onerror=()=>r(null)})}catch(_){return null}}
+if(canFS)(async()=>{DIR.lut=await hget('lut');DIR.img=await hget('img');if(tool==='export')renderPanel()})();
+async function pickDir(k){try{const h=await window.showDirectoryPicker({id:'csp-'+k,mode:'readwrite'});DIR[k]=h;await hput(k,h);renderPanel()}catch(_){}}
+async function perm(h){const o={mode:'readwrite'};try{if(await h.queryPermission(o)==='granted')return true;return(await h.requestPermission(o))==='granted'}catch(_){return false}}
+async function writeTo(h,name,blob){const dot=name.lastIndexOf('.'),base=name.slice(0,dot),ext=name.slice(dot);let n=name,i=2;
+  for(;;){try{await h.getFileHandle(n);n=`${base}-${i++}${ext}`}catch(_){break}}
+  const fh=await h.getFileHandle(n,{create:true}),w=await fh.createWritable();await w.write(blob);await w.close();return n}
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u){let c=~0;for(let i=0;i<u.length;i++)c=CRC[(c^u[i])&255]^(c>>>8);return(~c)>>>0}
+function makeZip(files){const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+  for(const f of files){const nm=enc.encode(f.name),d=f.data,c=crc32(d),h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(10,0,true);h.setUint16(12,0x21,true);h.setUint32(14,c,true);h.setUint32(18,d.length,true);h.setUint32(22,d.length,true);h.setUint16(26,nm.length,true);
+    parts.push(h,nm,d);const C=new DataView(new ArrayBuffer(46));
+    C.setUint32(0,0x02014b50,true);C.setUint16(4,20,true);C.setUint16(6,20,true);C.setUint16(14,0x21,true);C.setUint32(16,c,true);C.setUint32(20,d.length,true);C.setUint32(24,d.length,true);C.setUint16(28,nm.length,true);C.setUint32(42,off,true);
+    cen.push(C,nm);off+=30+nm.length+d.length}
+  const cs=cen.reduce((s,x)=>s+x.byteLength,0),E=new DataView(new ArrayBuffer(22));E.setUint32(0,0x06054b50,true);E.setUint16(8,files.length,true);E.setUint16(10,files.length,true);E.setUint32(12,cs,true);E.setUint32(16,off,true);
+  return new Blob([...parts,...cen,E],{type:'application/zip'})}
+let srcImg=null,IF='jpg',IQ=95,busy=false;
+const tick=()=>new Promise(r=>setTimeout(r,0));
+async function renderImage(){const img=srcImg;if(!img)throw new Error('No image');if(VID&&playing)play();const IW=img.videoWidth||img.naturalWidth||img.width,IH=img.videoHeight||img.naturalHeight||img.height,k=Math.min(1,6000/Math.max(IW,IH)),w=Math.round(IW*k),h=Math.round(IH*k);
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,w,h);
+  prep();const N=65,L=buildLut(N),N2=N*N,kk=(N-1)/255,G=N*3,B=N2*3,rows=Math.max(1,Math.floor(250000/w));
+  for(let y0=0;y0<h;y0+=rows){const hh=Math.min(rows,h-y0),id=x.getImageData(0,y0,w,hh),d=id.data;
+    for(let i=0;i<d.length;i+=4){const fr=d[i]*kk,fg=d[i+1]*kk,fb=d[i+2]*kk;let r0=fr|0,g0=fg|0,b0=fb|0;if(r0>N-2)r0=N-2;if(g0>N-2)g0=N-2;if(b0>N-2)b0=N-2;
+      const dr=fr-r0,dg=fg-g0,db=fb-b0,p=(b0*N2+g0*N+r0)*3;
+      for(let cc=0;cc<3;cc++){const q=p+cc,a0=L[q]+(L[q+3]-L[q])*dr,a1=L[q+G]+(L[q+G+3]-L[q+G])*dr,a2=L[q+B]+(L[q+B+3]-L[q+B])*dr,a3=L[q+B+G]+(L[q+B+G+3]-L[q+B+G])*dr,y1=a0+(a1-a0)*dg;d[i+cc]=(y1+(a2+(a3-a2)*dg-y1)*db)*255+.5}}
+    x.putImageData(id,0,y0);stat(`Rendering ${w}×${h}… ${Math.round(Math.min(1,(y0+hh)/h)*100)}%`);await tick()}
+  const blob=await new Promise(r=>c.toBlob(r,IF==='png'?'image/png':'image/jpeg',IQ/100));return{blob,w,h}}
+const safe=()=>(XN||'my-look').replace(/[^\w\- ]/g,'').trim()||'my-look';
+async function deliver(items){// items: [{kind,name,blob}]
+  if(canFS&&(DIR.lut||DIR.img)){const done=[];for(const it of items){const h=it.kind==='img'?(DIR.img||DIR.lut):(DIR.lut||DIR.img);
+      if(!await perm(h)){stat('Folder permission denied. Choose the folder again.');return}done.push(h.name+'/'+await writeTo(h,it.name,it.blob))}
+    stat('Saved: '+done.join(' · '));return}
+  if(dlr){const needZip=items.length>1||items.some(i=>i.name.endsWith('.cube'));
+    try{if(needZip){const files=[];for(const it of items)files.push({name:it.name,data:new Uint8Array(await it.blob.arrayBuffer())});
+        await dlr.save({filename:safe()+'.zip',data:makeZip(files)});stat('Saved '+safe()+'.zip (unzip to get the .cube)')}
+      else{await dlr.save({filename:items[0].name,data:items[0].blob});stat('Saved '+items[0].name)}}
+    catch(e){stat(e&&e.code==='declined'?'Cancelled.':'Save failed here ('+(e&&e.code||'error')+'). Try Copy LUT text.')}return}
+  for(const it of items){const a=document.createElement('a');a.href=URL.createObjectURL(it.blob);a.download=it.name;document.body.appendChild(a);a.click();a.remove();await new Promise(r=>setTimeout(r,400))}
+  stat('Downloaded: '+items.map(i=>i.name).join(', '))}
+async function doSave(what){if(busy)return;busy=true;XN=$('lname')?$('lname').value:XN;const items=[];
+  try{if(what!=='img')items.push({kind:'lut',name:safe()+'.cube',blob:new Blob([cubeText()],{type:'text/plain'})});
+    if(what!=='lut'){const r=await renderImage();items.push({kind:'img',name:safe()+(VID?'-frame-'+fmtT(VID.currentTime).replace(/[:.]/g,'-'):'-graded')+'.'+(IF==='png'?'png':'jpg'),blob:r.blob})}
+    await deliver(items)}catch(e){stat('Error: '+e.message)}busy=false}
+
+/* ============ video ============ */
+let VID=null,playing=false,SHOTS=[],lastSc=0;
+const fmtT=t=>{t=t||0;const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(2)};
+function stopVideo(){if(VID){VID.pause();try{URL.revokeObjectURL(VID.src)}catch(_){}VID.remove();VID=null}playing=false;SHOTS=[];$('vbar').hidden=true;$('shots').hidden=true;$('vplay').textContent='Play'}
+function loadVideo(f){stopVideo();const v=document.createElement('video');v.muted=true;v.playsInline=true;v.preload='auto';
+  v.style.cssText='position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none';document.body.appendChild(v);VID=v;
+  $('tag').textContent='LOADING VIDEO…';
+  v.onloadeddata=()=>{const k=Math.min(1,640/Math.max(v.videoWidth,v.videoHeight));view.width=Math.round(v.videoWidth*k);view.height=Math.round(v.videoHeight*k);out=vctx.createImageData(view.width,view.height);
+    $('vbar').hidden=false;$('vt').max=v.duration||0;$('tag').textContent=(f.name||'VIDEO').toUpperCase().slice(0,40);srcImg=v;v.currentTime=Math.min(.05,(v.duration||0)/2)};
+  v.onseeked=()=>grab(true);
+  v.onended=()=>{playing=false;$('vplay').textContent='Play';grab(true)};
+  v.onerror=()=>{$('tag').textContent='CAN\'T PLAY THIS VIDEO HERE: TRY MP4 (H.264)';stopVideo()};
+  v.src=URL.createObjectURL(f)}
+function grab(full){if(!VID||!VID.videoWidth)return;vctx.drawImage(VID,0,0,view.width,view.height);orig=vctx.getImageData(0,0,view.width,view.height);
+  $('vt').value=VID.currentTime;$('vtime').textContent=fmtT(VID.currentTime)+' / '+fmtT(VID.duration);
+  if(full){const w=Math.max(1,Math.round(view.width*150/Math.max(view.width,view.height))),h=Math.max(1,Math.round(view.height*150/Math.max(view.width,view.height))),t=document.createElement('canvas');t.width=w;t.height=h;
+    const tc=t.getContext('2d',{willReadFrequently:true});tc.drawImage(VID,0,0,w,h);const d=tc.getImageData(0,0,w,h).data;px=[];for(let i=0;i<d.length;i+=4)px.push([d[i],d[i+1],d[i+2]]);
+    statsSrc();schedule(true);markShots()}
+  else{if(!LUT){prep();LUT=buildLut(33);LN=33}const now=performance.now(),sc2=now-lastSc>250;if(sc2)lastSc=now;paint(sc2)}}
+function play(){if(!VID)return;if(playing){VID.pause();playing=false;$('vplay').textContent='Play';grab(true);return}
+  if(VID.ended||VID.currentTime>=VID.duration-.05)VID.currentTime=0;
+  playing=true;$('vplay').textContent='Pause';VID.play().catch(()=>{playing=false;$('vplay').textContent='Play'});
+  const rv=!!VID.requestVideoFrameCallback,step=()=>{if(!playing||!VID)return;grab(false);rv?VID.requestVideoFrameCallback(step):requestAnimationFrame(step)};rv?VID.requestVideoFrameCallback(step):requestAnimationFrame(step)}
+function seek(t){if(!VID)return;if(playing){VID.pause();playing=false;$('vplay').textContent='Play'}VID.currentTime=Math.max(0,Math.min(VID.duration||0,t))}
+const fstep=dir=>{if(VID)seek(VID.currentTime+dir/30)};
+function markShot(){if(!VID)return;const c=document.createElement('canvas'),k=46/view.height;c.width=Math.round(view.width*k);c.height=46;c.getContext('2d').drawImage(view,0,0,c.width,c.height);
+  SHOTS.push({t:VID.currentTime,img:c.toDataURL('image/jpeg',.7)});SHOTS.sort((a,b)=>a.t-b.t);markShots()}
+function markShots(){const el=$('shots');el.hidden=!SHOTS.length;el.innerHTML=SHOTS.map((s,i)=>`<button data-shot="${i}" aria-pressed="${VID&&Math.abs(VID.currentTime-s.t)<.02}" title="Shot ${i+1} at ${fmtT(s.t)}"><img src="${s.img}" alt="Shot ${i+1}"><span>${i+1} · ${fmtT(s.t)}</span></button>`).join('')+(SHOTS.length?'<button class="b" data-shclr="1" style="min-height:48px;padding:0 10px">Clear</button>':'')}
+$('vplay').onclick=play;$('vprev').onclick=()=>fstep(-1);$('vnext').onclick=()=>fstep(1);$('vmark').onclick=markShot;
+$('vt').oninput=e=>seek(+e.target.value);
+$('shots').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.shclr){SHOTS=[];return markShots()}seek(SHOTS[+b.dataset.shot].t)};
 
 /* ============ sample frame ============ */
 const sp=document.createElement('canvas');sp.width=800;sp.height=500;const g=sp.getContext('2d');
