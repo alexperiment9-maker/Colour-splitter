@@ -8,12 +8,18 @@ A colour grading tool in one web page, made for cinematographers, editors and co
 - **Light & white balance** – exposure in stops, temperature, tint, tap-a-grey-card white balance, auto white balance
 - **Tone** – contrast with pivot, highlights, shadows, whites, blacks, auto tone
 - **Curves** – master + red, green, blue
-- **Colour wheels** – lift, gamma, gain, offset with level sliders
+- **Primaries** – lift, gamma, gain, offset with master, red, green, blue controls
 - **Colour (HSL)** – saturation, skin-safe vibrance, tap any colour to change its hue, saturation and lightness
 - **Split tone** – shadow and highlight tint with balance
 - **B&W & film** – fade / matte blacks, black & white with colour filters and channel mixer
 - **Shot match** – load a reference frame and match colour and contrast to it
 - **Looks** – 11 built-in looks, save your own, share looks as code
+
+## Keyboard (desktop)
+
+`1`–`0` tools · `E` export · `Z` undo · `Y` redo · hold `B` before · `S` split · `F` false colour · `W` pick neutral · `Esc` cancel
+
+Every control has a number box for exact values and a ↺ reset.
 
 ## Checking tools
 
