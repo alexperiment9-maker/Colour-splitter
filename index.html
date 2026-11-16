@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Colour Splitter</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#141416">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: practical, bright, a paint-shop tool
+   IDEA: a paint-chip card generated from your own photo, plus a grading desk
+   PICTURE: the photo (live edited) beside a full stacked colour bar, chips below
+   COLOUR and TYPE: white / near-black ink, the photo's colours are the accent; Archivo
+   LAYOUT: title, photo + tabbed side panel (Colours / Edit & LUT), groups, main colours */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#121214);--ink:light-dark(#141416,#f1f1f3);--dim:light-dark(#5d5d66,#a3a3ad);--card:light-dark(#f4f4f6,#1d1d21);--line:light-dark(#e2e2e7,#2c2c33);--acc:light-dark(#1f5eff,#7ea2ff)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Archivo,system-ui,sans-serif;overflow-x:clip}
+.wrap{max-width:1240px;margin:0 auto;padding:clamp(16px,3vw,40px) max(4vw,14px)}
+h1{font-weight:800;font-size:clamp(32px,5vw,48px);line-height:1.05;margin:0 0 4px;letter-spacing:-.02em}
+h2{font-size:22px;margin:32px 0 12px;font-weight:800}
+h3{font-size:16px;margin:0 0 8px}
+.sub{color:var(--dim);margin:0 0 20px}
+.top{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px;align-items:start}
+.photo{position:sticky;top:8px;background:var(--card);border-radius:16px;overflow:hidden;min-height:280px;display:grid;place-items:center;border:2px dashed transparent;z-index:5}
+.photo.drag{border-color:var(--acc)}
+.photo canvas{display:block;max-width:100%;max-height:560px;width:auto;height:auto;cursor:crosshair;touch-action:manipulation}
+.tag{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.6);color:#fff;font-size:13px;padding:3px 9px;border-radius:20px;pointer-events:none}
+.hold{position:absolute;right:10px;bottom:10px;font:600 14px Archivo,sans-serif;min-height:40px;padding:0 14px;border-radius:20px;border:0;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none}
+.ring{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #000;pointer-events:none;display:none}
+.side{display:flex;flex-direction:column;gap:14px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:600 16px Archivo,sans-serif;min-height:48px;padding:0 18px;border-radius:12px;border:0;cursor:pointer;background:var(--ink);color:var(--bg);display:inline-flex;align-items:center}
+.btn.alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn.sm{min-height:44px;font-size:15px;padding:0 14px}
+button:focus-visible,input:focus-visible,select:focus-visible,label.btn:focus-within{outline:3px solid var(--acc);outline-offset:2px}
+input[type=file]{position:absolute;opacity:0;width:1px;height:1px}
+.tabs{display:flex;background:var(--card);border-radius:12px;padding:4px;gap:4px}
+.tabs button{flex:1;font:600 15px Archivo,sans-serif;min-height:44px;border:0;border-radius:9px;background:transparent;color:var(--ink);cursor:pointer}
+.tabs button[aria-selected=true]{background:var(--bg);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.pane[hidden]{display:none}
+.pane{display:flex;flex-direction:column;gap:12px}
+.ctl{background:var(--card);border-radius:14px;padding:12px 16px}
+.sl{display:block;margin:2px 0}
+.sl span{display:flex;justify-content:space-between;font-weight:600;font-size:14px}
+.sl output{font-variant-numeric:tabular-nums;color:var(--acc)}
+.sl input{width:100%;accent-color:var(--acc);height:30px;margin:0}
+.ctl small,.hint{color:var(--dim);font-size:13px}
+.stack{display:flex;height:56px;border-radius:12px;overflow:hidden}
+.stack div{height:100%}
+.tl{display:flex;flex-wrap:wrap;gap:6px}
+.tc{display:flex;align-items:center;gap:6px;min-height:44px;padding:4px 10px 4px 4px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font:600 13px Archivo,sans-serif;cursor:pointer}
+.tc[aria-pressed=true]{border-color:var(--acc)}
+.tc i{display:flex;width:34px;height:34px;border-radius:7px;overflow:hidden}
+.tc i b{flex:1}
+.ed[hidden]{display:none}
+.edtop{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+.ba{display:flex;height:40px;border-radius:9px;overflow:hidden;flex:1;max-width:160px}
+.ba b{flex:1;display:grid;place-items:center;font-size:11px;font-weight:600}
+.link{font:600 14px Archivo,sans-serif;color:var(--acc);background:none;border:0;cursor:pointer;min-height:44px;padding:0 6px}
+.pre{display:flex;flex-wrap:wrap;gap:6px}
+.pre button{font:600 14px Archivo,sans-serif;min-height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.ex{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.ex input,.ex select{font:16px Archivo,sans-serif;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 10px}
+.ex .btn{justify-content:center}
+.status{font-size:13px;color:var(--dim);min-height:18px;margin:6px 0 0}
+.fam{display:grid}
+.row{display:grid;grid-template-columns:120px minmax(0,1fr) 64px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.row b{font-weight:600}
+.pct{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.shades{display:flex;gap:4px;flex-wrap:wrap}
+.sh{flex:1 1 60px;min-width:52px;height:44px;border-radius:8px;display:flex;align-items:flex-end;justify-content:center;font:600 12px Archivo,sans-serif;padding-bottom:3px;border:0;cursor:pointer}
+.main{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.chip{background:var(--card);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.chip .sw{height:110px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px 12px;font-weight:800;font-size:22px}
+.chip dl{margin:0;padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px}
+.chip dt{color:var(--dim)}.chip dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip .nm{padding:12px 14px 0;font-weight:600;font-size:17px}
+.cb{display:flex;gap:6px;margin:auto 14px 14px}
+.cb button{flex:1;font:600 14px Archivo,sans-serif;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.empty{color:var(--dim);padding:40px;text-align:center}
+@media(max-width:760px){.top{grid-template-columns:1fr}.photo{top:0;border-radius:0 0 14px 14px;min-height:200px}.photo canvas{max-height:40vh}}
+@media(max-width:480px){.row{grid-template-columns:84px minmax(0,1fr) 52px;gap:8px}.sh{min-width:40px;font-size:11px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Colour Splitter</h1>
+  <p class="sub">See which colours a photo is made of, change any of them, and save the look as a .cube LUT.</p>
+  <div class="top">
+    <div class="photo" id="drop">
+      <canvas id="view" aria-label="Photo. Tap a colour to edit it."></canvas>
+      <div class="ring" id="ring"></div>
+      <span class="tag" id="tag">Sample picture</span>
+      <button class="hold" id="hold">Hold: before</button>
+    </div>
+    <div class="side">
+      <div class="btns">
+        <label class="btn">Take photo<input type="file" id="cam" accept="image/*" capture="environment"></label>
+        <label class="btn alt">Choose image<input type="file" id="pick" accept="image/*"></label>
+      </div>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="t1" aria-selected="true">Colours</button>
+        <button role="tab" id="t2" aria-selected="false">Edit &amp; LUT</button>
+      </div>
+
+      <div class="pane" id="p1">
+        <div class="ctl">
+          <label class="sl"><span>Shades per colour <output id="so">3</output></span><input type="range" id="shades" min="1" max="8" value="3"></label>
+          <small>1 = one tone per group; more splits each group into lighter and darker shades.</small>
+        </div>
+        <div class="ctl">
+          <label class="sl"><span>Main colours to show <output id="mo">6</output></span><input type="range" id="mainN" min="3" max="10" value="6"></label>
+        </div>
+        <div class="stack" id="stack" aria-label="Colour share bar"></div>
+        <p class="hint">Tap any colour on the photo or below to edit it.</p>
+      </div>
+
+      <div class="pane" id="p2" hidden>
+        <div class="ctl">
+          <h3>Quick looks</h3>
+          <div class="pre" id="pre"></div>
+        </div>
+        <div class="ctl">
+          <h3>Colours you're changing</h3>
+          <div class="tl" id="tl"></div>
+          <p class="hint" id="tlh">Tap a colour on the photo to pick it.</p>
+          <div class="ed" id="ed" hidden>
+            <div class="edtop"><div class="ba" id="ba"></div><button class="link" id="del">Remove</button></div>
+            <label class="sl"><span id="hLab">Hue shift <output id="oH">0°</output></span><input type="range" id="tH" min="-180" max="180" value="0"></label>
+            <label class="sl"><span>Saturation <output id="oS">0</output></span><input type="range" id="tS" min="-100" max="100" value="0"></label>
+            <label class="sl"><span>Lightness <output id="oL">0</output></span><input type="range" id="tL" min="-100" max="100" value="0"></label>
+            <label class="sl"><span>Range (similar colours) <output id="oR">30°</output></span><input type="range" id="tR" min="8" max="90" value="30"></label>
+          </div>
+        </div>
+        <div class="ctl">
+          <h3>Whole picture</h3>
+          <label class="sl"><span>Exposure <output id="oE">0</output></span><input type="range" id="gE" min="-2" max="2" step="0.05" value="0"></label>
+          <label class="sl"><span>Contrast <output id="oC">0</output></span><input type="range" id="gC" min="-100" max="100" value="0"></label>
+          <label class="sl"><span>Saturation <output id="oG">0</output></span><input type="range" id="gS" min="-100" max="100" value="0"></label>
+          <label class="sl"><span>Warmth <output id="oW">0</output></span><input type="range" id="gW" min="-100" max="100" value="0"></label>
+          <label class="sl"><span>Tint (green – magenta) <output id="oT">0</output></span><input type="range" id="gT" min="-100" max="100" value="0"></label>
+        </div>
+        <div class="ctl">
+          <h3>Save as LUT</h3>
+          <div class="ex">
+            <input id="lname" value="my-look" aria-label="LUT name">
+            <select id="lsize" aria-label="LUT size"><option value="17">17 (small)</option><option value="33" selected>33 (standard)</option><option value="65">65 (max quality)</option></select>
+            <button class="btn sm" id="dl">Download .cube</button>
+            <button class="btn sm alt" id="cp">Copy .cube text</button>
+          </div>
+          <p class="status" id="st">Works in Premiere, DaVinci Resolve, Final Cut, CapCut, Photoshop, LumaFusion.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Colour groups</h2>
+  <div class="fam" id="fam"></div>
+
+  <h2>Main colours in this picture</h2>
+  <div class="main" id="main"></div>
+</div>
+<script>
+{
+const $=id=>document.getElementById(id);
+const view=$('view'),vctx=view.getContext('2d',{willReadFrequently:true});
+let px=[],orig=null,out=null,lut=null,showOrig=false;
+const ST={targets:[],sel:-1,g:{exp:0,con:0,sat:0,warm:0,tint:0}};
+const FAM=['Red','Orange','Yellow','Green','Cyan','Blue','Purple','Pink','Brown','White','Grey','Black'];
+const NAMES=[['Black',0,0,0],['White',255,255,255],['Grey',128,128,128],['Silver',192,192,192],['Charcoal',54,69,79],['Red',220,30,40],['Maroon',128,0,0],['Crimson',220,20,60],['Coral',255,127,80],['Salmon',250,128,114],['Orange',255,140,0],['Peach',255,203,164],['Gold',255,200,0],['Yellow',255,235,59],['Cream',255,248,220],['Beige',225,210,180],['Tan',210,180,140],['Brown',120,72,40],['Chocolate',90,50,25],['Olive',128,128,0],['Lime',160,220,40],['Green',40,160,60],['Forest green',34,90,34],['Mint',170,240,200],['Teal',0,128,128],['Cyan',0,200,220],['Sky blue',135,206,235],['Blue',30,90,220],['Navy',20,30,90],['Indigo',75,0,130],['Purple',130,50,170],['Lavender',200,180,240],['Magenta',220,0,180],['Pink',255,150,190],['Rose',230,90,130]];
+
+/* ---------- colour maths ---------- */
+function hsl01(r,g,b){const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;let h=0,s=0;
+  if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h*=60}
+  return[h,s,l]}
+const hsl=(r,g,b)=>hsl01(r/255,g/255,b/255);
+function hsl2rgb(h,s,l){h=(((h%360)+360)%360)/360;if(s<=0)return[l,l,l];
+  const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q,f=t=>{if(t<0)t+=1;if(t>1)t-=1;return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p};
+  return[f(h+1/3),f(h),f(h-1/3)]}
+const ss=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
+const cl=v=>v<0?0:v>1?1:v;
+function family([r,g,b]){const[h,s,l]=hsl(r,g,b);
+  if(l<.12)return'Black';if(l>.9&&s<.35)return'White';if(s<.14||(s<.25&&l<.3))return l>.75?'White':l<.18?'Black':'Grey';
+  if(h>=12&&h<48&&l<.42)return'Brown';
+  if(h<12||h>=345)return'Red';if(h<40)return'Orange';if(h<68)return'Yellow';if(h<165)return'Green';if(h<195)return'Cyan';if(h<255)return'Blue';if(h<290)return'Purple';return'Pink'}
+const hex=c=>'#'+c.map(v=>Math.round(v).toString(16).padStart(2,'0')).join('').toUpperCase();
+const lum=c=>(0.299*c[0]+0.587*c[1]+0.114*c[2]);
+const txt=c=>lum(c)>150?'#141416':'#ffffff';
+function nameOf(c){let best='',bd=1e9;for(const[n,r,g,b]of NAMES){const d=(c[0]-r)**2*2+(c[1]-g)**2*4+(c[2]-b)**2*3;if(d<bd){bd=d;best=n}}return best}
+function cmyk([r,g,b]){const k=1-Math.max(r,g,b)/255;if(k>=1)return[0,0,0,100];return[(1-r/255-k)/(1-k),(1-g/255-k)/(1-k),(1-b/255-k)/(1-k),k].map(v=>Math.round(v*100))}
+
+/* ---------- the look: one function used by preview AND the .cube ---------- */
+function xf(r,g,b){
+  const[h0,s0,l0]=hsl01(r,g,b);let h=h0,s=s0,l=l0;
+  for(const t of ST.targets){
+    if(!t.dh&&!t.ds&&!t.dl)continue;
+    let w;
+    if(t.neutral)w=(1-ss(.08,.25,s0))*Math.max(0,1-Math.abs(l0-t.l)/(t.range/150));
+    else{let d=Math.abs(h0-t.h)%360;if(d>180)d=360-d;w=d<t.range?.5+.5*Math.cos(Math.PI*d/t.range):0;w*=ss(.03,.15,s0)}
+    if(w<=0)continue;
+    const ds=t.ds/100*w,dl=t.dl/100*w;
+    if(t.neutral){if(ds>0){const th=(t.dh+360)%360;h=s<.02?th:h+(((th-h+540)%360)-180)*w;s=s+(.6-s)*ds}else s*=1+ds}
+    else{h+=t.dh*w;s=ds>0?s+(1-s)*ds:s*(1+ds)}
+    l=dl>0?l+(1-l)*dl*.8:l*(1+dl*.8);
+  }
+  let[R,G,B]=(h===h0&&s===s0&&l===l0)?[r,g,b]:hsl2rgb(h,cl(s),cl(l));
+  const q=ST.g;
+  if(q.exp){const m=2**q.exp;R=Math.pow(R**2.2*m,1/2.2);G=Math.pow(G**2.2*m,1/2.2);B=Math.pow(B**2.2*m,1/2.2)}
+  if(q.warm){const k=q.warm/100*.09;R+=k;B-=k}
+  if(q.tint){const k=q.tint/100*.07;G-=k;R+=k/2;B+=k/2}
+  if(q.con){const k=1+q.con/100;R=.5+(R-.5)*k;G=.5+(G-.5)*k;B=.5+(B-.5)*k}
+  if(q.sat){const Y=.2126*R+.7152*G+.0722*B,f=1+q.sat/100;R=Y+(R-Y)*f;G=Y+(G-Y)*f;B=Y+(B-Y)*f}
+  return[cl(R),cl(G),cl(B)];
+}
+function isIdentity(){const q=ST.g;return!q.exp&&!q.con&&!q.sat&&!q.warm&&!q.tint&&!ST.targets.some(t=>t.dh||t.ds||t.dl)}
+function buildLut(N){const a=new Float32Array(N*N*N*3),d=N-1;let i=0;
+  for(let b=0;b<N;b++)for(let g=0;g<N;g++)for(let r=0;r<N;r++){const o=xf(r/d,g/d,b/d);a[i++]=o[0];a[i++]=o[1];a[i++]=o[2]}
+  return a}
+function cubeText(N){const a=buildLut(N),name=($('lname').value||'my-look').replace(/"/g,'');
+  const L=['# Made with Colour Splitter','TITLE "'+name+'"','LUT_3D_SIZE '+N,'DOMAIN_MIN 0.0 0.0 0.0','DOMAIN_MAX 1.0 1.0 1.0'];
+  for(let i=0;i<a.length;i+=3)L.push(a[i].toFixed(6)+' '+a[i+1].toFixed(6)+' '+a[i+2].toFixed(6));
+  return L.join('\n')+'\n'}
+
+/* ---------- preview: photo through the same LUT (trilinear) ---------- */
+const PN=33;
+function paint(){
+  if(!orig)return;
+  if(showOrig||isIdentity()){vctx.putImageData(orig,0,0);return}
+  const s=orig.data,o=out.data,N=PN,N2=N*N,k=(N-1)/255,L=lut;
+  for(let i=0;i<s.length;i+=4){
+    const fr=s[i]*k,fg=s[i+1]*k,fb=s[i+2]*k,r0=fr|0,g0=fg|0,b0=fb|0,
+      dr=fr-r0,dg=fg-g0,db=fb-b0,r1=r0<N-1?1:0,g1=g0<N-1?N:0,b1=b0<N-1?N2:0,
+      c000=(b0*N2+g0*N+r0)*3;
+    for(let c=0;c<3;c++){
+      const p=c000+c,
+      x00=L[p]+(L[p+r1*3]-L[p])*dr,
+      x10=L[p+g1*3]+(L[p+(g1+r1)*3]-L[p+g1*3])*dr,
+      x01=L[p+b1*3]+(L[p+(b1+r1)*3]-L[p+b1*3])*dr,
+      x11=L[p+(b1+g1)*3]+(L[p+(b1+g1+r1)*3]-L[p+(b1+g1)*3])*dr,
+      y0=x00+(x10-x00)*dg,y1=x01+(x11-x01)*dg;
+      o[i+c]=(y0+(y1-y0)*db)*255+.5;
+    }
+    o[i+3]=s[i+3];
+  }
+  vctx.putImageData(out,0,0);
+}
+let raf=0;
+function schedule(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;lut=buildLut(PN);paint();drawTargets()})}
+
+/* ---------- colour targets ---------- */
+function pick(c,switchTab){
+  const[h,s,l]=hsl(...c),neutral=s<.15||l<.08||l>.94;
+  let i=ST.targets.findIndex(t=>neutral?t.neutral&&Math.abs(t.l-l)<.15:!t.neutral&&Math.min(Math.abs(t.h-h),360-Math.abs(t.h-h))<14);
+  if(i<0){ST.targets.push({h,s,l,neutral,range:neutral?40:30,dh:0,ds:0,dl:0,src:c.map(Math.round)});i=ST.targets.length-1}
+  ST.sel=i;if(switchTab)tab(2);syncEditor();drawTargets();
+}
+function drawTargets(){
+  $('tl').innerHTML=ST.targets.map((t,i)=>{const a=xf(...t.src.map(v=>v/255)).map(v=>v*255);
+    return`<button class="tc" data-i="${i}" aria-pressed="${i===ST.sel}"><i><b style="background:${hex(t.src)}"></b><b style="background:${hex(a)}"></b></i>${family(t.src)}</button>`}).join('');
+  $('tlh').hidden=ST.targets.length>0;
+  const t=ST.targets[ST.sel];$('ed').hidden=!t;
+  if(t){const a=xf(...t.src.map(v=>v/255)).map(v=>v*255);
+    $('ba').innerHTML=`<b style="background:${hex(t.src)};color:${txt(t.src)}">Before</b><b style="background:${hex(a)};color:${txt(a)}">After</b>`}
+}
+const TS=[['tH','dh','oH',v=>v+'°'],['tS','ds','oS',v=>v],['tL','dl','oL',v=>v],['tR','range','oR',v=>v+'°']];
+function syncEditor(){const t=ST.targets[ST.sel];if(!t)return;
+  for(const[id,k,o,f]of TS){$(id).value=t[k];$(o).textContent=f(t[k])}
+  $('hLab').firstChild.textContent=t.neutral?'Tint colour ':'Hue shift ';
+  if(t.neutral)$('oH').textContent=((t.dh+360)%360)+'° hue';
+}
+for(const[id,k,o,f]of TS)$(id).addEventListener('input',e=>{const t=ST.targets[ST.sel];if(!t)return;t[k]=+e.target.value;
+  $(o).textContent=t.neutral&&k==='dh'?((t[k]+360)%360)+'° hue':f(t[k]);schedule()});
+$('tl').onclick=e=>{const b=e.target.closest('.tc');if(!b)return;ST.sel=+b.dataset.i;syncEditor();drawTargets()};
+$('del').onclick=()=>{ST.targets.splice(ST.sel,1);ST.sel=ST.targets.length-1;syncEditor();schedule();drawTargets()};
+
+const GS=[['gE','exp','oE',v=>(v>0?'+':'')+(+v).toFixed(2)],['gC','con','oC',v=>v],['gS','sat','oG',v=>v],['gW','warm','oW',v=>v],['gT','tint','oT',v=>v]];
+for(const[id,k,o,f]of GS)$(id).addEventListener('input',e=>{ST.g[k]=+e.target.value;$(o).textContent=f(ST.g[k]);schedule()});
+function syncGlobal(){for(const[id,k,o,f]of GS){$(id).value=ST.g[k];$(o).textContent=f(ST.g[k])}}
+
+/* ---------- quick looks ---------- */
+const T=(h,range,dh,ds,dl)=>{const c=hsl2rgb(h,.75,.5).map(v=>Math.round(v*255));return{h,s:.75,l:.5,neutral:false,range,dh,ds,dl,src:c}};
+const PRE={
+  'Reset':()=>({g:{},t:[]}),
+  'Teal & orange':()=>({g:{con:15,sat:5,warm:5},t:[T(28,35,0,25,5),T(210,55,-25,15,-5),T(120,45,45,-25,0)]}),
+  'Warm film':()=>({g:{con:10,sat:-10,warm:35,tint:5},t:[T(120,40,-10,-20,0)]}),
+  'Moody':()=>({g:{exp:-.3,con:20,sat:-30,warm:-10},t:[T(30,30,0,10,0)]}),
+  'Vivid':()=>({g:{con:15,sat:30},t:[]}),
+  'Black & white':()=>({g:{con:15,sat:-100},t:[]})
+};
+$('pre').innerHTML=Object.keys(PRE).map(k=>`<button data-k="${k}">${k}</button>`).join('');
+$('pre').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=PRE[b.dataset.k]();
+  ST.g=Object.assign({exp:0,con:0,sat:0,warm:0,tint:0},p.g);ST.targets=p.t;ST.sel=p.t.length?0:-1;
+  syncGlobal();syncEditor();schedule();drawTargets()};
+
+/* ---------- analysis ---------- */
+function kmeans(pts,k){
+  if(!pts.length)return[];k=Math.min(k,pts.length);
+  const sorted=pts.slice().sort((a,b)=>lum(a)-lum(b));
+  let cen=[];for(let i=0;i<k;i++)cen.push(sorted[Math.floor((i+.5)*sorted.length/k)].slice());
+  const as=new Int16Array(pts.length);
+  for(let it=0;it<12;it++){
+    const sum=cen.map(()=>[0,0,0,0]);
+    for(let i=0;i<pts.length;i++){const p=pts[i];let bi=0,bd=1e9;
+      for(let j=0;j<k;j++){const c=cen[j],d=(p[0]-c[0])**2+(p[1]-c[1])**2+(p[2]-c[2])**2;if(d<bd){bd=d;bi=j}}
+      as[i]=bi;const s=sum[bi];s[0]+=p[0];s[1]+=p[1];s[2]+=p[2];s[3]++}
+    cen=cen.map((c,j)=>sum[j][3]?[sum[j][0]/sum[j][3],sum[j][1]/sum[j][3],sum[j][2]/sum[j][3]]:c);
+  }
+  const cnt=new Array(k).fill(0);for(let i=0;i<pts.length;i++)cnt[as[i]]++;
+  return cen.map((c,j)=>({c,n:cnt[j]})).filter(x=>x.n>0);
+}
+function analyse(){
+  const N=px.length;if(!N)return;
+  const shadesN=+$('shades').value,mainN=+$('mainN').value;
+  const groups={};for(const p of px){const f=family(p);(groups[f]=groups[f]||[]).push(p)}
+  const fams=FAM.filter(f=>groups[f]).map(f=>{
+    const g=groups[f],avg=[0,1,2].map(i=>g.reduce((s,p)=>s+p[i],0)/g.length);
+    return{f,n:g.length,avg,sh:kmeans(g,shadesN).sort((a,b)=>lum(a.c)-lum(b.c))}
+  }).sort((a,b)=>b.n-a.n);
+  const pc=n=>n/N*100,fmt=v=>v<0.1?'<0.1%':v.toFixed(1)+'%';
+  $('stack').innerHTML=fams.map(x=>`<div style="flex:${x.n};background:${hex(x.avg)}" title="${x.f} ${fmt(pc(x.n))}"></div>`).join('');
+  $('fam').innerHTML=fams.map(x=>`<div class="row"><b>${x.f}</b><div class="shades">${
+    x.sh.map(s=>`<button class="sh" data-c="${s.c.map(Math.round)}" style="flex-grow:${s.n};background:${hex(s.c)};color:${txt(s.c)}" aria-label="Edit ${hex(s.c)}">${fmt(pc(s.n))}</button>`).join('')
+  }</div><span class="pct">${fmt(pc(x.n))}</span></div>`).join('');
+  const main=kmeans(px,mainN).sort((a,b)=>b.n-a.n);
+  $('main').innerHTML=main.map(m=>{const c=m.c.map(Math.round),[h,s,l]=hsl(...c),k=cmyk(c),H=hex(c);
+    return`<div class="chip"><div class="sw" style="background:${H};color:${txt(c)}"><span>${fmt(pc(m.n))}</span><span style="font-size:14px">${family(c)}</span></div>
+    <div class="nm">${nameOf(c)}</div><dl>
+    <dt>HEX</dt><dd>${H}</dd><dt>RGB</dt><dd>${c.join(', ')}</dd>
+    <dt>HSL</dt><dd>${Math.round(h)}°, ${Math.round(s*100)}%, ${Math.round(l*100)}%</dd>
+    <dt>CMYK</dt><dd>${k.join(', ')}</dd><dt>Brightness</dt><dd>${Math.round(lum(c)/2.55)}%</dd></dl>
+    <div class="cb"><button class="copy" data-h="${H}">Copy</button><button class="edit" data-c="${c}">Edit colour</button></div></div>`}).join('');
+}
+const editFrom=b=>{pick(b.dataset.c.split(',').map(Number),true);$('drop').scrollIntoView({behavior:'smooth',block:'nearest'})};
+$('fam').onclick=e=>{const b=e.target.closest('.sh');if(b)editFrom(b)};
+$('main').onclick=e=>{const ed=e.target.closest('.edit');if(ed)return editFrom(ed);
+  const b=e.target.closest('.copy');if(!b)return;
+  const done=()=>{b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1200)};
+  try{navigator.clipboard.writeText(b.dataset.h).then(done,()=>b.textContent=b.dataset.h)}catch(_){b.textContent=b.dataset.h}};
+
+/* ---------- loading photos ---------- */
+function load(img,label){
+  const mw=900,sc=Math.min(1,mw/Math.max(img.width,img.height));
+  view.width=Math.max(1,Math.round(img.width*sc));view.height=Math.max(1,Math.round(img.height*sc));
+  vctx.drawImage(img,0,0,view.width,view.height);
+  orig=vctx.getImageData(0,0,view.width,view.height);out=vctx.createImageData(view.width,view.height);
+  const s=Math.min(1,160/Math.max(img.width,img.height)),w=Math.max(1,Math.round(img.width*s)),h=Math.max(1,Math.round(img.height*s));
+  const t=document.createElement('canvas');t.width=w;t.height=h;const tc=t.getContext('2d',{willReadFrequently:true});
+  tc.drawImage(img,0,0,w,h);const d=tc.getImageData(0,0,w,h).data;px=[];
+  for(let i=0;i<d.length;i+=4)if(d[i+3]>128)px.push([d[i],d[i+1],d[i+2]]);
+  $('tag').textContent=label;$('ring').style.display='none';analyse();schedule();
+}
+function fromFile(f){if(!f||!f.type.startsWith('image/'))return;const u=URL.createObjectURL(f),im=new Image();
+  im.onload=()=>{load(im,f.name||'Your photo');URL.revokeObjectURL(u)};im.onerror=()=>{$('fam').innerHTML='<p class="empty">Could not read that image. Try a JPG or PNG.</p>'};im.src=u}
+$('cam').onchange=e=>fromFile(e.target.files[0]);
+$('pick').onchange=e=>fromFile(e.target.files[0]);
+const drop=$('drop');
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('drag')};
+drop.ondragleave=()=>drop.classList.remove('drag');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('drag');fromFile(e.dataTransfer.files[0])};
+
+// tap the photo to pick a colour (averages a small 5x5 patch from the ORIGINAL)
+view.addEventListener('click',e=>{
+  if(!orig)return;const r=view.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*view.width),y=Math.floor((e.clientY-r.top)/r.height*view.height);
+  let s=[0,0,0],n=0;
+  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const X=x+dx,Y=y+dy;if(X<0||Y<0||X>=view.width||Y>=view.height)continue;const o=(Y*view.width+X)*4;s[0]+=orig.data[o];s[1]+=orig.data[o+1];s[2]+=orig.data[o+2];n++}
+  const dr=drop.getBoundingClientRect(),ring=$('ring');ring.style.left=(e.clientX-dr.left)+'px';ring.style.top=(e.clientY-dr.top)+'px';ring.style.display='block';
+  pick(s.map(v=>v/n),true);
+});
+const hold=$('hold'),on=()=>{showOrig=true;paint()},off=()=>{if(showOrig){showOrig=false;paint()}};
+hold.addEventListener('pointerdown',e=>{e.preventDefault();on()});
+['pointerup','pointerleave','pointercancel'].forEach(ev=>hold.addEventListener(ev,off));
+
+/* ---------- tabs ---------- */
+function tab(n){$('t1').setAttribute('aria-selected',n===1);$('t2').setAttribute('aria-selected',n===2);$('p1').hidden=n!==1;$('p2').hidden=n!==2}
+$('t1').onclick=()=>tab(1);$('t2').onclick=()=>tab(2);
+
+/* ---------- export ---------- */
+const st=$('st');
+let dlr=null;
+if(window.claude&&window.claude.use)window.claude.use('downloads').then(d=>dlr=d,()=>{});
+$('dl').onclick=async()=>{const N=+$('lsize').value,t=cubeText(N),name=($('lname').value||'my-look').replace(/[^\w\- ]/g,'')+'.cube';
+  if(dlr){try{await dlr.save({filename:name,data:t});st.textContent='Saved '+name+'.'}catch(_){st.textContent='Save was cancelled or blocked. You can use Copy instead.'}return}
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'application/octet-stream'}));a.download=name;document.body.appendChild(a);a.click();a.remove();
+    st.textContent='Saving '+name+'. If nothing downloads, use Copy .cube text.'}
+  catch(_){st.textContent='Download blocked here. Use Copy .cube text instead.'}};
+$('cp').onclick=()=>{const N=+$('lsize').value,t=cubeText(N);
+  try{navigator.clipboard.writeText(t).then(()=>st.textContent='Copied '+N+'³ LUT. Paste into a text file and save it as name.cube.',()=>st.textContent='Copy was blocked. Try Download instead.')}
+  catch(_){st.textContent='Copy was blocked. Try Download instead.'}};
+$('shades').oninput=e=>{$('so').textContent=e.target.value;clearTimeout(analyse.t);analyse.t=setTimeout(analyse,60)};
+$('mainN').oninput=e=>{$('mo').textContent=e.target.value;clearTimeout(analyse.t);analyse.t=setTimeout(analyse,60)};
+
+/* ---------- sample picture ---------- */
+const sp=document.createElement('canvas');sp.width=800;sp.height=560;const g=sp.getContext('2d');
+let gr=g.createLinearGradient(0,0,0,330);gr.addColorStop(0,'#2b3a8c');gr.addColorStop(.55,'#e2557a');gr.addColorStop(1,'#ffb347');
+g.fillStyle=gr;g.fillRect(0,0,800,330);
+g.fillStyle='#ffe066';g.beginPath();g.arc(520,300,70,0,7);g.fill();
+gr=g.createLinearGradient(0,330,0,560);gr.addColorStop(0,'#1f6fa8');gr.addColorStop(1,'#0c2c4a');g.fillStyle=gr;g.fillRect(0,330,800,230);
+g.fillStyle='#2f7d3a';g.beginPath();g.moveTo(0,560);g.lineTo(0,380);g.quadraticCurveTo(160,300,330,420);g.quadraticCurveTo(380,470,420,560);g.fill();
+g.fillStyle='#1d4f25';g.beginPath();g.moveTo(0,560);g.lineTo(0,450);g.quadraticCurveTo(120,410,260,560);g.fill();
+g.fillStyle='#6b4423';g.fillRect(640,420,110,90);g.fillStyle='#f5f5f0';g.fillRect(660,440,30,30);
+g.fillStyle='#b8323a';g.beginPath();g.moveTo(625,425);g.lineTo(695,370);g.lineTo(765,425);g.fill();
+const si=new Image();si.onload=()=>load(si,'Sample picture');si.src=sp.toDataURL();
+drawTargets();
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
