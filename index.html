@@ -150,6 +150,7 @@ td.n{text-align:right}
     <div class="vb" id="mbar" hidden>
       <button class="b on" id="mstop">Stop camera</button>
       <button class="b" id="mflip">Flip</button>
+      <button class="b" id="mrec" title="Record graded video (R)">● Rec</button>
       <button class="b" id="mfreeze" title="Freeze this frame to grade and export it">Freeze &amp; grade</button>
       <button class="b" id="mfull">Full screen</button>
     </div>
@@ -207,7 +208,7 @@ const D=()=>({input:'none',match:{on:0,str:100},light:{exp:0,temp:0,tint:0},
   tone:{con:0,piv:45,hi:0,sh:0,wh:0,bl:0},
   prim:{lift:[0,0,0,0],gamma:[0,0,0,0],gain:[0,0,0,0],offset:[0,0,0,0]},
   curves:{m:I2(),r:I2(),g:I2(),b:I2()},col:{sat:0,vib:0,targets:[]},
-  split:{sh:200,shs:0,hh:40,hs:0,bal:0},film:{fade:0,bw:0,mr:30,mg:59,mb:11},ext:{on:0,mix:100}});
+  split:{sh:200,shs:0,hh:40,hs:0,bal:0},film:{fade:0,bw:0,mr:30,mg:59,mb:11},grain:{amt:0,size:1.5,rough:50,col:0},ext:{on:0,mix:100}});
 let S=D(),SEL=-1;const DJ=JSON.stringify(D());
 const get=(k,o=S)=>k.split('.').reduce((a,p)=>a[p],o);
 const set=(k,v)=>{const p=k.split('.'),l=p.pop();p.reduce((a,q)=>a[q],S)[l]=v};
@@ -297,6 +298,17 @@ function xf(r,g,b,upto=9){
 function buildLut(N){const a=new Float32Array(N*N*N*3),d=N-1;let i=0;
   for(let b=0;b<N;b++)for(let g=0;g<N;g++)for(let r=0;r<N;r++){const o=xf(r/d,g/d,b/d);a[i++]=o[0];a[i++]=o[1];a[i++]=o[2]}return a}
 
+/* ============ film grain (same maths on CPU and GPU) ============ */
+const fr=v=>v-Math.floor(v);
+function gh(x,y,sd){x=((x%289)+289)%289;y=((y%289)+289)%289;let a=fr(x*123.34),b=fr(y*456.21);const d=a*(a+45.32+sd)+b*(b+45.32+sd);a+=d;b+=d;return fr(a*b)}
+function vn(x,y,sd){const ix=Math.floor(x),iy=Math.floor(y);let fx=x-ix,fy=y-iy;fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);
+  const a=gh(ix,iy,sd),b=gh(ix+1,iy,sd),c=gh(ix,iy+1,sd),d=gh(ix+1,iy+1,sd),t=a+(b-a)*fx;return t+((c+(d-c)*fx)-t)*fy}
+function gn(x,y,sd,w){return(vn(x,y,sd)+vn(x*2.03+17,y*2.03+17,sd)*.5*w)/(1+.5*w)-.5}
+let GSEED=.137;
+function grainAt(o,i,x,y,gs,A,w,cc,sd){const px_=x/gs,py_=y/gs,n=gn(px_,py_,sd,w),Y=(.2126*o[i]+.7152*o[i+1]+.0722*o[i+2])/255,k=A*255*(.35+2.6*Y*(1-Y));
+  if(cc>0){const nr=n+(gn(px_+31,py_+31,sd,w)-n)*cc,ng=n+(gn(px_+63,py_+63,sd,w)-n)*cc,nb=n+(gn(px_+97,py_+97,sd,w)-n)*cc;o[i]+=nr*k;o[i+1]+=ng*k;o[i+2]+=nb*k}
+  else{const v=n*k;o[i]+=v;o[i+1]+=v;o[i+2]+=v}}
+
 /* ============ preview ============ */
 let LUT=null,LN=33;
 function sample(r,g,b){const L=LUT,N=LN,N2=N*N,k=(N-1)/255,fr=r*k,fg=g*k,fb=b*k;let r0=fr|0,g0=fg|0,b0=fb|0;if(r0>N-2)r0=N-2;if(g0>N-2)g0=N-2;if(b0>N-2)b0=N-2;
@@ -306,13 +318,15 @@ function fcol(Y){const e=Y/2.55;return e<2.5?[123,44,255]:e<4?[30,107,255]:e<38?
 let disp=null;
 function paint(full){
   if(!orig)return;const s=orig.data,o=out.data,w=orig.width,wx=V.split?Math.round(w*V.wp):-1,use=!(showOrig||Q.id);
-  const L=LUT,N=LN,N2=N*N,k=(N-1)/255,G=N*3,B=N2*3;let x=0;
+  const L=LUT,N=LN,N2=N*N,k=(N-1)/255,G=N*3,B=N2*3,Gr=S.grain,GA=Gr.amt/100*.25,gs=Gr.size*orig.height/1080,gw=Gr.rough/100,gc=Gr.col/100;let x=0,y=0;
   for(let i=0;i<s.length;i+=4){let r=s[i],g=s[i+1],b=s[i+2];
     if(use&&x>=wx){const fr=r*k,fg=g*k,fb=b*k;let r0=fr|0,g0=fg|0,b0=fb|0;if(r0>N-2)r0=N-2;if(g0>N-2)g0=N-2;if(b0>N-2)b0=N-2;
       const dr=fr-r0,dg=fg-g0,db=fb-b0,p=(b0*N2+g0*N+r0)*3;
       for(let c=0;c<3;c++){const q=p+c,a0=L[q]+(L[q+3]-L[q])*dr,a1=L[q+G]+(L[q+G+3]-L[q+G])*dr,a2=L[q+B]+(L[q+B+3]-L[q+B])*dr,a3=L[q+B+G]+(L[q+B+G+3]-L[q+B+G])*dr,y0=a0+(a1-a0)*dg,v=(y0+(a2+(a3-a2)*dg-y0)*db)*255;
         if(c===0)r=v;else if(c===1)g=v;else b=v}}
-    o[i]=r;o[i+1]=g;o[i+2]=b;o[i+3]=255;if(++x===w)x=0}
+    o[i]=r;o[i+1]=g;o[i+2]=b;o[i+3]=255;
+    if(GA&&use&&x>=wx)grainAt(o,i,x,y,gs,GA,gw,gc,GSEED);
+    if(++x===w){x=0;y++}}
   if(full)drawScope();
   if(V.fc||V.zeb||V.peak){const h=orig.height;if(!disp||disp.width!==w||disp.height!==h)disp=vctx.createImageData(w,h);const q=disp.data;q.set(o);
     const zt=V.zeb*2.55-.5;let xx=0,yy=0;
@@ -377,7 +391,7 @@ $('hold').addEventListener('pointerdown',e=>{e.preventDefault();before(true)});
 ['pointerup','pointerleave','pointercancel'].forEach(ev=>$('hold').addEventListener(ev,()=>before(false)));
 
 /* ============ controls ============ */
-const FMT={'light.exp':2,'match.str':0};
+const FMT={'light.exp':2,'match.str':0,'grain.size':1};
 const nf=(k,v)=>(+v).toFixed(FMT[k]||0);
 function row(k,label,mn,mx,st=1,hue){const v=get(k),dv=get(k,D()),mod=v!==dv;
   return`<div class="r${hue?' hue':''}${mod?' mod':''}" data-row="${k}"><label for="n_${k}">${label}</label><input type="number" id="n_${k}" data-k="${k}" min="${mn}" max="${mx}" step="${st}" value="${nf(k,v)}"><button class="x" data-rs="${k}" title="Reset" aria-label="Reset ${label}">↺</button><input type="range" data-k="${k}" min="${mn}" max="${mx}" step="${st}" value="${v}" aria-label="${label}"></div>`}
@@ -399,6 +413,7 @@ const lookOnly=()=>{const o=deep(S);delete o.input;delete o.match;delete o.ext;r
 function applyLook(l){const keep={input:S.input,match:S.match};S=mg(D(),l);S.input=keep.input;S.match=keep.match;SEL=S.col.targets.length?0:-1;renderPanel();schedule(true);push()}
 const BWF={None:[30,59,11],Red:[90,20,-10],Orange:[70,40,-10],Yellow:[50,60,-10],Green:[10,90,0],Blue:[-10,20,90]};
 let PG='lift',CH='m',tool='light',pickMode='hsl';
+const GPRE={Clean:{amt:0},'35mm':{amt:18,size:1.1,rough:40,col:10},'16mm':{amt:32,size:1.8,rough:60,col:15},'Super 8':{amt:50,size:2.6,rough:85,col:25}};
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 const TOOLS=[
@@ -424,6 +439,9 @@ const TOOLS=[
  ['film','B&W / Film','9',()=>row('film.fade','Fade (matte)',0,100)+`<div class="sec">BLACK & WHITE</div><button class="b" id="bwt" aria-pressed="${!!S.film.bw}">B&W ${S.film.bw?'ON':'OFF'}</button>
    <div class="grid2" style="grid-template-columns:repeat(3,minmax(0,1fr))">${Object.keys(BWF).map(k=>`<button class="b" data-bwf="${k}">${k}</button>`).join('')}</div>`+
    row('film.mr','Mix red',-100,200)+row('film.mg','Mix green',-100,200)+row('film.mb','Mix blue',-100,200)],
+ ['grain','Film grain','N',()=>`<div class="grid4">${Object.keys(GPRE).map(k=>`<button class="b" data-gp="${k}">${k}</button>`).join('')}</div>`+
+   row('grain.amt','Amount',0,100)+row('grain.size','Size',.5,4,.1)+row('grain.rough','Roughness',0,100)+row('grain.col','Colour grain',0,100)+
+   `<p class="hint">Grain scales with the frame, sits mostly in the mid-tones like real film, and moves every frame in video. A LUT can't hold grain, so it goes into saved images and videos but not the .cube. Add grain in your editor too, or export the video here.</p>`],
  ['match','Decode ref','0',()=>`<p class="hint" style="margin-top:8px">Load a reference frame: a film still, another clip, a post you like.</p>
    <div class="grid2"><span class="b">Load reference<input type="file" id="refin" accept="image/*" aria-label="Load reference"></span></div>
    ${REF?`<div class="sec">DECODE INTO SLIDERS (recommended)</div><button class="b on" id="decode" style="width:100%">Decode look → sliders</button>
@@ -439,6 +457,9 @@ const TOOLS=[
    <div class="sec">GRADED IMAGE</div><div class="grid4"><button class="b" data-fmt="jpg" aria-pressed="${IF==='jpg'}">JPG</button><button class="b" data-fmt="png" aria-pressed="${IF==='png'}">PNG</button></div>
    ${IF==='jpg'?`<div class="r"><label for="iq">JPG quality</label><input type="number" id="iq" min="60" max="100" value="${IQ}"><span></span></div>`:''}
    <p class="hint">Full resolution of the opened photo (up to 6000 px long side), always with the full grade.</p>
+   ${VID&&!CAM?`<div class="sec">GRADED VIDEO</div><div class="grid4">${[['720','720p'],['1080','1080p'],['orig','Original']].map(([k,l])=>`<button class="b" data-vq="${k}" aria-pressed="${VQ===k}">${l}</button>`).join('')}</div>
+   ${REC&&!REC.live?`<button class="b" id="vcancel" style="width:100%;margin-top:6px">Cancel video export</button>`:`<button class="b on" id="svvid" style="width:100%;margin-top:6px">Export graded video</button>`}
+   <p class="hint">Grade + grain + original sound. Renders in real time (a 1-minute clip takes 1 minute): keep this screen open. Saves ${vidFmt()}.</p>`:''}
    <div class="sec">SAVE TO</div>${folderUI()}
    <div class="grid2" style="margin-top:8px"><button class="b on" id="svlut">Save LUT</button><button class="b on" id="svimg">Save image</button><button class="b" id="svboth">Save both</button><button class="b" id="cp">Copy LUT text</button></div>
    <p class="st" id="st"></p>`]];
@@ -483,6 +504,8 @@ panel.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)retu
   if(d.sz){XS=+d.sz;return renderPanel()}
   if(d.ti!=null){SEL=+d.ti;return drawTargets()}
   if(d.cs){CS=d.cs;return renderPanel()}
+  if(d.vq){VQ=d.vq;return renderPanel()}
+  if(d.gp){Object.assign(S.grain,{amt:0,size:1.5,rough:50,col:0},GPRE[d.gp]);renderPanel();schedule(true);push();return}
   if(d.fmt){IF=d.fmt;return renderPanel()}
   if(d.dir){pickDir(d.dir);return}
   if(d.dclr){DIR[d.dclr]=null;hput(d.dclr,null);return renderPanel()}
@@ -503,6 +526,7 @@ panel.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)retu
     case'fixuse':{const fromGrade=!(CS==='ext'&&EXT);EXT=FIXED;FIXED=null;CS='ext';if(fromGrade){const inp=S.input;S=D();S.input=inp;SEL=-1}S.ext.on=1;S.ext.mix=100;renderPanel();schedule(true);push();break}
     case'fixsave':deliver([{kind:'lut',name:FIXED.name,blob:new Blob([cubeFrom(FIXED)],{type:'text/plain'})}]);break;
     case'extuse':S.ext.on=S.ext.on?0:1;renderPanel();schedule(true);push();break;
+    case'svvid':exportVideo();break;case'vcancel':cancelRec();break;
     case'svlut':doSave('lut');break;case'svimg':doSave('img');break;case'svboth':doSave('both');break;case'cp':exportCp();break}});
 
 /* curves */
@@ -603,6 +627,7 @@ addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select')||e.m
   else if(k==='w'){openTool('light');setPick('wb')}else if(k==='Escape')setPick('hsl');
   else if(k==='p')togPk();else if(k==='g')togGrid();else if(k==='l'){CAM?stopCam():startCam()}
   else if(CAM&&k===' '){freeze();e.preventDefault()}
+  else if(CAM&&k==='r'){recLive()}
   else if(VID&&k===' '){play();e.preventDefault()}else if(VID&&k===','){fstep(-1)}else if(VID&&k==='.'){fstep(1)}else if(VID&&k==='m'){markShot()}});
 addEventListener('keyup',e=>{if(e.key==='b')before(false)});
 
@@ -800,6 +825,7 @@ async function renderImage(){const img=srcImg;if(!img)throw new Error('No image'
     for(let i=0;i<d.length;i+=4){const fr=d[i]*kk,fg=d[i+1]*kk,fb=d[i+2]*kk;let r0=fr|0,g0=fg|0,b0=fb|0;if(r0>N-2)r0=N-2;if(g0>N-2)g0=N-2;if(b0>N-2)b0=N-2;
       const dr=fr-r0,dg=fg-g0,db=fb-b0,p=(b0*N2+g0*N+r0)*3;
       for(let cc=0;cc<3;cc++){const q=p+cc,a0=L[q]+(L[q+3]-L[q])*dr,a1=L[q+G]+(L[q+G+3]-L[q+G])*dr,a2=L[q+B]+(L[q+B+3]-L[q+B])*dr,a3=L[q+B+G]+(L[q+B+G+3]-L[q+B+G])*dr,y1=a0+(a1-a0)*dg;d[i+cc]=(y1+(a2+(a3-a2)*dg-y1)*db)*255+.5}}
+    const Gr=S.grain;if(Gr.amt){const GA=Gr.amt/100*.25,gs=Gr.size*h/1080;for(let yy=0,i=0;yy<hh;yy++)for(let xx=0;xx<w;xx++,i+=4)grainAt(d,i,xx,y0+yy,gs,GA,Gr.rough/100,Gr.col/100,.137)}
     x.putImageData(id,0,y0);stat(`Rendering ${w}×${h}… ${Math.round(Math.min(1,(y0+hh)/h)*100)}%`);await tick()}
   const blob=await new Promise(r=>c.toBlob(r,IF==='png'?'image/png':'image/jpeg',IQ/100));return{blob,w,h}}
 const safe=()=>(XN||'my-look').replace(/[^\w\- ]/g,'').trim()||'my-look';
@@ -838,7 +864,8 @@ function grab(full){if(!VID||!VID.videoWidth)return;vctx.drawImage(VID,0,0,view.
   if(full){const w=Math.max(1,Math.round(view.width*150/Math.max(view.width,view.height))),h=Math.max(1,Math.round(view.height*150/Math.max(view.width,view.height))),t=document.createElement('canvas');t.width=w;t.height=h;
     const tc=t.getContext('2d',{willReadFrequently:true});tc.drawImage(VID,0,0,w,h);const d=tc.getImageData(0,0,w,h).data;px=[];for(let i=0;i<d.length;i+=4)px.push([d[i],d[i+1],d[i+2]]);
     statsSrc();schedule(true);if(!CAM)markShots()}
-  else{if(!LUT){prep();LUT=buildLut(33);LN=33}const now=performance.now(),sc2=now-lastSc>250;if(sc2)lastSc=now;paint(sc2);if(CAM&&sc2)hud()}}
+  else{if(!LUT){prep();LUT=buildLut(33);LN=33}GSEED=fr(GSEED+.6180339);const now=performance.now(),sc2=now-lastSc>250;if(sc2)lastSc=now;paint(sc2);if(CAM&&sc2)hud();
+    if(REC&&REC.live){if(REC.lut!==LUT){glLut(LUT,LN);REC.lut=LUT}glDraw(VID,GSEED);if(sc2)$('mrec').textContent='■ Stop '+fmtT((performance.now()-REC.t0)/1000).slice(0,-3)}}}
 function play(){if(!VID||CAM)return;if(playing){VID.pause();playing=false;$('vplay').textContent='Play';grab(true);return}
   if(VID.ended||VID.currentTime>=VID.duration-.05)VID.currentTime=0;
   playing=true;$('vplay').textContent='Pause';VID.play().catch(()=>{playing=false;$('vplay').textContent='Play'});
@@ -869,7 +896,7 @@ async function startCam(){stopVideo();$('tag').textContent='STARTING CAMERA…';
     setTimeout(()=>{if(CAM&&VID===v)grab(true)},1200)}
   catch(e){$('live').classList.remove('on');stopVideo();
     $('tag').textContent=inFrame?'CAMERA IS BLOCKED INSIDE CLAUDE · OPEN YOUR GITHUB LINK':(e&&e.name==='NotAllowedError'?'CAMERA PERMISSION DENIED':'NO CAMERA AVAILABLE')}}
-function stopCam(){stopVideo();$('live').classList.remove('on');$('tag').textContent='CAMERA STOPPED'}
+function stopCam(){if(REC&&REC.live){REC.stopAfter=true;REC.rec.stop();return}stopVideo();$('live').classList.remove('on');$('tag').textContent='CAMERA STOPPED'}
 function freeze(){if(!CAM||!VID)return;const v=VID,c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);
   stopVideo();$('live').classList.remove('on');load(c,'FROZEN FRAME '+c.width+'×'+c.height)}
 $('live').onclick=()=>CAM?stopCam():startCam();$('mstop').onclick=stopCam;
@@ -877,6 +904,77 @@ $('mflip').onclick=()=>{camFacing=camFacing==='environment'?'user':'environment'
 $('mfreeze').onclick=freeze;
 $('mfull').onclick=()=>{const f=$('drop');try{document.fullscreenElement?document.exitFullscreen():f.requestFullscreen().catch(()=>{})}catch(_){}};
 document.addEventListener('visibilitychange',async()=>{if(CAM&&document.visibilityState==='visible'&&!wake){try{wake=await navigator.wakeLock.request('screen')}catch(_){}}});
+
+/* ============ GPU renderer (LUT + grain) for video export ============ */
+const GL={c:null,gl:null,ok:false,u:{},it:null,lt:null};
+function glInit(){if(GL.gl)return GL.ok;const c=document.createElement('canvas'),gl=c.getContext('webgl2',{premultipliedAlpha:false,preserveDrawingBuffer:false,antialias:false});GL.c=c;GL.gl=gl;if(!gl)return GL.ok=false;
+  const vs=`#version 300 es
+in vec2 a;out vec2 uv;void main(){uv=a*.5+.5;gl_Position=vec4(a,0.,1.);}`;
+  const fs=`#version 300 es
+precision highp float;precision highp sampler3D;
+uniform sampler2D img;uniform sampler3D lut;uniform float N;uniform vec4 gr;uniform float seed;uniform vec2 res;in vec2 uv;out vec4 o;
+float h(vec2 p){p=mod(p,289.);p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32+seed);return fract(p.x*p.y);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}
+float gn(vec2 p){return(vn(p)+vn(p*2.03+17.)*.5*gr.w)/(1.+.5*gr.w)-.5;}
+void main(){vec2 t=vec2(uv.x,1.-uv.y);vec3 c=texture(img,t).rgb;c=texture(lut,c*((N-1.)/N)+.5/N).rgb;
+if(gr.x>0.){vec2 p=t*res/gr.y;float n=gn(p);vec3 nc=vec3(n);if(gr.z>0.)nc=mix(nc,vec3(gn(p+31.),gn(p+63.),gn(p+97.)),gr.z);float Y=dot(c,vec3(.2126,.7152,.0722));c+=nc*gr.x*(.35+2.6*Y*(1.-Y));}
+o=vec4(clamp(c,0.,1.),1.);}`;
+  const sh=(t,src)=>{const x=gl.createShader(t);gl.shaderSource(x,src);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(x));return x};
+  try{const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error('link');gl.useProgram(p);
+    const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);const al=gl.getAttribLocation(p,'a');gl.enableVertexAttribArray(al);gl.vertexAttribPointer(al,2,gl.FLOAT,false,0,0);
+    for(const n of['img','lut','N','gr','seed','res'])GL.u[n]=gl.getUniformLocation(p,n);gl.uniform1i(GL.u.img,0);gl.uniform1i(GL.u.lut,1);
+    GL.it=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,GL.it);[gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER].forEach(q=>gl.texParameteri(gl.TEXTURE_2D,q,gl.LINEAR));[gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T].forEach(q=>gl.texParameteri(gl.TEXTURE_2D,q,gl.CLAMP_TO_EDGE));
+    GL.lt=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_3D,GL.lt);[gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER].forEach(q=>gl.texParameteri(gl.TEXTURE_3D,q,gl.LINEAR));[gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T,gl.TEXTURE_WRAP_R].forEach(q=>gl.texParameteri(gl.TEXTURE_3D,q,gl.CLAMP_TO_EDGE));
+    return GL.ok=true}catch(e){console.warn(e);return GL.ok=false}}
+function glSize(w,h){GL.c.width=w;GL.c.height=h;GL.gl.viewport(0,0,w,h)}
+function glLut(L,N){const gl=GL.gl;gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_3D,GL.lt);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);gl.texImage3D(gl.TEXTURE_3D,0,gl.RGB16F,N,N,N,0,gl.RGB,gl.FLOAT,L);gl.uniform1f(GL.u.N,N)}
+function glDraw(src,seed){const gl=GL.gl,G=S.grain;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,GL.it);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
+  gl.uniform4f(GL.u.gr,G.amt/100*.25,G.size*GL.c.height/1080,G.col/100,G.rough/100);gl.uniform1f(GL.u.seed,seed);gl.uniform2f(GL.u.res,GL.c.width,GL.c.height);gl.drawArrays(gl.TRIANGLE_STRIP,0,4)}
+function pickMime(audio){const L=audio?['video/mp4;codecs="avc1.640028,mp4a.40.2"','video/mp4;codecs="avc1.4D401F,mp4a.40.2"','video/mp4;codecs="avc1.42E01E,mp4a.40.2"','video/webm;codecs="vp9,opus"','video/webm;codecs="vp8,opus"','video/webm','video/mp4']:['video/mp4;codecs="avc1.640028"','video/mp4;codecs="avc1.4D401F"','video/mp4;codecs="avc1.42E01E"','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+  if(!window.MediaRecorder)return'';for(const m of L)if(MediaRecorder.isTypeSupported(m))return m;return''}
+const vidFmt=()=>{const m=pickMime(true);return m?(m.includes('avc1')?'MP4 (H.264)':m.includes('webm')?'WebM (this browser can\'t make H.264 MP4; CapCut and Resolve open WebM, Premiere needs it converted)':'MP4'):'nothing: this browser can\'t record video'};
+let REC=null,VQ='1080';
+const even=v=>Math.max(2,Math.round(v/2)*2);
+function cancelRec(){if(!REC)return;REC.cancel=true;try{REC.v&&REC.v.pause()}catch(_){}if(REC.rec.state!=='inactive')REC.rec.stop()}
+async function exportVideo(){if(!VID||CAM||REC)return;
+  if(!glInit())return stat('Video export needs WebGL2, which this browser does not have.');
+  const mime=pickMime(true);if(!mime)return stat('This browser cannot record video.');
+  if(playing)play();
+  const v=document.createElement('video');v.playsInline=true;v.preload='auto';v.style.cssText='position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none';v.src=VID.src;document.body.appendChild(v);
+  let actx=null;try{actx=new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(_){}
+  try{await new Promise((r,j)=>{v.onloadeddata=r;v.onerror=()=>j(new Error('cannot read the video'))})}catch(e){v.remove();return stat('Error: '+e.message)}
+  const cap=VQ==='orig'?3840:VQ==='720'?1280:1920,k=Math.min(1,cap/Math.max(v.videoWidth,v.videoHeight)),w=even(v.videoWidth*k),h=even(v.videoHeight*k);
+  prep();glSize(w,h);glLut(buildLut(33),33);
+  const stream=GL.c.captureStream(30);let hasA=false;
+  if(actx){try{const sN=actx.createMediaElementSource(v),dN=actx.createMediaStreamDestination();sN.connect(dN);dN.stream.getAudioTracks().forEach(t=>{stream.addTrack(t);hasA=true})}catch(_){}}
+  const m2=pickMime(hasA),rec=new MediaRecorder(stream,{mimeType:m2,videoBitsPerSecond:Math.min(40e6,Math.round(w*h*30*.2))}),chunks=[];
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};const done=new Promise(r=>rec.onstop=r);
+  REC={rec,v,live:false,cancel:false};renderPanel();
+  v.currentTime=0;await new Promise(r=>{v.onseeked=r;setTimeout(r,1500)});glDraw(v,0);
+  let f=0;const rv=!!v.requestVideoFrameCallback;
+  const step=()=>{if(!REC||REC.cancel)return;glDraw(v,fr(f++*.6180339));stat(`Exporting ${w}×${h}… ${Math.round(v.currentTime/(v.duration||1)*100)}%. Keep this screen open.`);if(!v.ended)rv?v.requestVideoFrameCallback(step):requestAnimationFrame(step)};
+  v.onended=()=>{setTimeout(()=>{if(rec.state!=='inactive')rec.stop()},250)};
+  rec.start(1000);
+  try{await v.play()}catch(_){v.muted=true;try{await v.play()}catch(e){cancelRec()}}
+  rv?v.requestVideoFrameCallback(step):requestAnimationFrame(step);
+  await done;v.remove();try{actx&&actx.close()}catch(_){}
+  const cancelled=REC.cancel;REC=null;renderPanel();
+  if(cancelled)return stat('Video export cancelled.');
+  const ext=m2.includes('mp4')?'mp4':'webm';await deliver([{kind:'img',name:safe()+'-graded.'+ext,blob:new Blob(chunks,{type:m2.split(';')[0]})}])}
+async function recLive(){if(!CAM)return;if(REC){if(REC.live)REC.rec.stop();return}
+  if(!glInit()){$('tag').textContent='RECORDING NEEDS WEBGL2';return}
+  const v=VID,k=Math.min(1,1920/Math.max(v.videoWidth,v.videoHeight));glSize(even(v.videoWidth*k),even(v.videoHeight*k));
+  const stream=GL.c.captureStream(30);let mic=null;
+  try{mic=await navigator.mediaDevices.getUserMedia({audio:true});mic.getAudioTracks().forEach(t=>stream.addTrack(t))}catch(_){}
+  const m2=pickMime(!!mic);if(!m2){$('tag').textContent='THIS BROWSER CANNOT RECORD VIDEO';return}
+  const rec=new MediaRecorder(stream,{mimeType:m2,videoBitsPerSecond:12e6}),chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  REC={rec,live:true,lut:null,t0:performance.now(),mic};$('mrec').classList.add('on');
+  rec.onstop=async()=>{const R2=REC;REC=null;$('mrec').classList.remove('on');$('mrec').textContent='● Rec';if(R2&&R2.mic)R2.mic.getTracks().forEach(t=>t.stop());
+    const ext=m2.includes('mp4')?'mp4':'webm',d=new Date(),ts=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+String(d.getSeconds()).padStart(2,'0');
+    if(R2&&R2.stopAfter){stopVideo();$('live').classList.remove('on');$('tag').textContent='CAMERA STOPPED'}
+    await deliver([{kind:'img',name:safe()+'-live-'+ts+'.'+ext,blob:new Blob(chunks,{type:m2.split(';')[0]})}]);$('tag').textContent=($('st')&&$('st').textContent)||'RECORDING SAVED'};
+  rec.start(1000)}
+$('mrec').onclick=recLive;
 
 /* ============ sample frame ============ */
 const sp=document.createElement('canvas');sp.width=800;sp.height=500;const g=sp.getContext('2d');

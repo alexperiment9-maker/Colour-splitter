@@ -17,7 +17,7 @@ A colour grading tool in one web page, made for cinematographers, editors and co
 
 ## Keyboard (desktop)
 
-`1`–`0` tools · `K` LUT check · `E` export · `L` live camera · `P` peaking · `G` grid · `Space` play/pause (live: freeze) · `,` `.` frame step · `M` mark shot · `Z` undo · `Y` redo · hold `B` before · `S` split · `F` false colour · `W` pick neutral · `Esc` cancel
+`1`–`0` tools · `K` LUT check · `E` export · `N` film grain · `L` live camera · `R` record (live) · `P` peaking · `G` grid · `Space` play/pause (live: freeze) · `,` `.` frame step · `M` mark shot · `Z` undo · `Y` redo · hold `B` before · `S` split · `F` false colour · `W` pick neutral · `Esc` cancel
 
 Every control has a number box for exact values and a ↺ reset.
 
@@ -33,9 +33,15 @@ Tap **Live** to use your phone or laptop camera as a grading monitor:
 
 Needs the GitHub (https) version; the Claude viewer blocks camera access.
 
+## Film grain
+
+Amount, size, roughness, colour grain; presets 35mm, 16mm, Super 8. Scales with the frame, sits in the mid-tones, moves every frame. Added to saved images and videos (a LUT can't store grain).
+
 ## Video
 
-Open an MP4/WebM clip and play it with the grade live. Scrub, step frame by frame, mark shots to jump between them, and export any frame at full resolution. Scopes and frame report update when paused. (ProRes/RAW and some HEVC files can't play in browsers: export an H.264 proxy.)
+Open an MP4/WebM clip and play it with the grade live. Scrub, step frame by frame, mark shots to jump between them, and export any frame at full resolution.
+
+**Export graded video**: grade + grain + original sound, 720p / 1080p / original (up to 4K), rendered on the GPU in real time. Saves MP4 (H.264) where the browser supports it, otherwise WebM. Live camera has **● Rec** to record the graded view (with mic if allowed). Scopes and frame report update when paused. (ProRes/RAW and some HEVC files can't play in browsers: export an H.264 proxy.)
 
 ## LUT check
 
