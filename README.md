@@ -17,9 +17,21 @@ A colour grading tool in one web page, made for cinematographers, editors and co
 
 ## Keyboard (desktop)
 
-`1`–`0` tools · `K` LUT check · `E` export · `Space` play/pause · `,` `.` frame step · `M` mark shot · `Z` undo · `Y` redo · hold `B` before · `S` split · `F` false colour · `W` pick neutral · `Esc` cancel
+`1`–`0` tools · `K` LUT check · `E` export · `L` live camera · `P` peaking · `G` grid · `Space` play/pause (live: freeze) · `,` `.` frame step · `M` mark shot · `Z` undo · `Y` redo · hold `B` before · `S` split · `F` false colour · `W` pick neutral · `Esc` cancel
 
 Every control has a number box for exact values and a ↺ reset.
+
+## Live monitor (pocket field monitor)
+
+Tap **Live** to use your phone or laptop camera as a grading monitor:
+- your grade/LUT applied live
+- false colour, zebras (90/95/100 IRE), focus peaking
+- frame guides (2.39, 1.85, 16:9, 4:5, 9:16, 1:1) and rule-of-thirds grid
+- live scope and exposure readout (average IRE, clipped %, crushed %)
+- flip camera, full screen, screen stays awake
+- **Freeze & grade**: grab the frame at full camera resolution to fine-tune and export the LUT
+
+Needs the GitHub (https) version; the Claude viewer blocks camera access.
 
 ## Video
 
